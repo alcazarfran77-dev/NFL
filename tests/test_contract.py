@@ -162,7 +162,7 @@ def test_reliability_gate_separates_repeatable_from_noisy_metrics():
     for pid in range(60):
         talent = rng.normal()
         for att in (1, 2):
-            rows.append({"nfl_id": pid, "attempt": att, "drill_group": "forty", "drill_name": "FORTY",
+            rows.append({"nfl_id": pid, "attempt": att, "drill_group": "forty", "drill_type": "FORTY_YARD_DASH", "drill_name": "FORTY",
                          "split_5_10_s": 0.75 - 0.03 * talent + rng.normal(0, 0.005),   # repeatable
                          "split_0_5_s": rng.normal(1.3, 0.1)})                           # start noise
     att = pd.DataFrame(rows)

@@ -27,8 +27,10 @@ Player features (CT_FEATURES; best attempt per metric, as the official Combine k
   sprint acceleration    ct_forty_split_5_10_s          0.87 (5 -> 10 yd; lower = better)
   sprint top speed       ct_forty_top_speed             0.99 (same construct as the 10-20 yd split, 0.98)
   change of direction    ct_shuttle_plant_speed_ratio   0.54 (speed kept through the shuttle turns)
-  position-drill speed   ct_skill_speed_z               0.78 (top speed z-scored within drill name, player mean)
-  position-drill accel.  ct_skill_accel_z               0.55 (peak acceleration, same scaling)
+  position-drill speed   ct_skill_speed_z               top speed z-scored within each drill (position group x
+                                                        drill name), player mean
+  position-drill accel.  ct_skill_accel_z               peak acceleration, same scaling
+  (reliabilities on the delivered file are in reports/metrics/ct_reliability.csv)
 
 Business rules (configs/config.yaml -> combine_tracking_rules)
   R16 ball rows and rows without nfl_id dropped; frames must be 0.1 s apart within an attempt;
@@ -192,11 +194,18 @@ def attempt_metrics(frames: pd.DataFrame, cfg: Config) -> tuple[pd.DataFrame, di
     return pd.DataFrame(out), audit
 
 
+DRILL_KEY = ["drill_type", "drill_name"]  # a drill as run by one position group (GAUNTLET_DRILL: WR, TE, DB)
+
+
 def _skill_z(attempts: pd.DataFrame, metrics) -> pd.DataFrame:
-    """Skill-drill attempts with each metric z-scored within its drill name (drills differ by design)."""
+    """Position-drill attempts with each metric z-scored within its drill (position group x drill name).
+
+    Drills differ by design, and the same drill name can be run by several position groups (the gauntlet by
+    WRs, TEs and DBs), so the reference group is the drill as run by one position group.
+    """
     sk = attempts[attempts.drill_group == "skill"].copy()
     for m in metrics:
-        g = sk.groupby("drill_name")[m]
+        g = sk.groupby(DRILL_KEY)[m]
         sk[f"{m}_z"] = (sk[m] - g.transform("mean")) / g.transform("std").replace(0, np.nan)
     return sk
 
@@ -222,7 +231,7 @@ def attempt_reliability(attempts: pd.DataFrame, min_reliability: float = 0.5) ->
             rows.append({"drill_group": grp, "metric": m, "method": "test-retest (attempts 1 vs 2)",
                          "n_players": len(w), "reliability": r})
     skill_metrics = [m for m in RELIABILITY_METRICS["skill"] if m in attempts.columns]
-    sk = _skill_z(attempts, skill_metrics).sort_values(["nfl_id", "drill_name", "attempt"])
+    sk = _skill_z(attempts, skill_metrics).sort_values(["nfl_id", *DRILL_KEY, "attempt"])
     sk["half"] = sk.groupby("nfl_id").cumcount() % 2
     for m in RELIABILITY_METRICS["skill"]:
         if sk.empty or m not in skill_metrics:
