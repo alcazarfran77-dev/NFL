@@ -1,19 +1,37 @@
-# CGMT — Combine-to-Game Movement Translation (v1.0.1)
+# CGMT — Combine-to-Game Movement Translation (v2.0.0)
 
-Do NFL Combine drills predict how a prospect moves in games, and does in-game
-movement tell us who becomes a starter? This project answers that for one
-narrow slice of movement: **the first two seconds after the snap**.
+Do NFL Combine drills predict how a prospect moves and performs in regular-season
+games, and does that tell us who becomes a starter? This project answers it for one
+narrow slice of movement, **the first seconds after the snap**, measured two ways:
 
-It introduces the **Snap Burst Index (SBI)**: distance covered 2.0 s after the
-snap (the game analog of the 10-yard split), averaged over a player's plays,
-shrunk toward his position group by empirical Bayes and scaled 50 ± 10 within
-position, like other scouting grades.
+- the **Snap Burst Index (SBI)**: distance covered 2.0 s after the snap from 10 Hz
+  tracking (the game analog of the 10-yard split), averaged over a player's plays,
+  shrunk toward his position group by empirical Bayes and scaled 50 ± 10 within position;
+- **season-long on-field metrics over expected** (v2.0, from `player_play`): DL get-off
+  and pressure rate, OL pressure probability and pressures allowed, WR/TE separation at
+  the throw, each scored against the average prospect play in the same context
+  (alignment, dropback length, route).
 
 The technical report (methods, figures, metrics, statistical tests and
 insights) is published as a Claude doc; `reports/` holds every number and
 figure it cites.
 
-## Headline findings
+## Headline findings (v2.0)
+
+1. **Drills forecast DL get-off, and get-off drives pressure.** Within the defensive line the
+   vertical, 40, 10-yd split and broad jump correlate 0.36-0.43 with season-long get-off over
+   expected (FDR q < 0.05), also within edge/interior role. About half of each drill's link to
+   pressure runs through get-off (10-yd split indirect effect 0.15 SD, 95% CI 0.04-0.30).
+2. **Combine models predict DL get-off and WR/TE separation, not pressure or protection.**
+   Pooled out-of-fold R^2 0.13 (get-off, random forest) and 0.19 (separation, ridge; size-led);
+   DL pressure and OL protection do not beat position alone. OL protection tracks draft capital.
+3. **Season-long metrics are reliable traits** (ICC: get-off 0.89, WR separation 0.75, OL 0.74),
+   and the tracking SBI is a valid get-off proxy (rho 0.39 with season-long get-off, 0.49 with pressure).
+4. **On-field performance adds a little to starter prediction; projections add nothing.** Observed
+   on-field performance +0.004 to +0.009 AUC (GLM OR 1.47 per SD beyond draft pick, p = 0.04);
+   a stacked Combine -> on-field projector changes AUC by -0.002 to +0.0004.
+
+### Version 1 findings (all reproduced unchanged)
 
 1. **Check reliability before you trust a tracking metric.** Snap burst is a
    stable player trait only on the defensive line (ICC 0.62). For WRs and DBs
@@ -38,21 +56,22 @@ figure it cites.
 ```
 configs/config.yaml        single source of truth: paths, business rules, CV, grids
 configs/smoke.yaml         same pipeline on tiny CV/grids (CI)
-data/raw/                  the six input CSVs (not in git; hashed in data/manifest.json)
-data/processed/            prospects, per-play metrics, player movement profiles (parquet)
+data/raw/                  the seven input CSVs (not in git; hashed in data/manifest.json)
+data/processed/            prospects, tracking play metrics, movement profiles, on-field plays + profiles (parquet)
 src/cgmt/
   data.py                  schema validation, referential integrity, SHA-256 manifest
   cleaning.py              business rules R1-R7, starter target
   movement.py              tracking cleaning (R8-R9), per-play metrics, SBI, reliability
+  performance.py           player_play rules R10-R14, on-field metrics over expected, stability (v2.0)
   features.py              nested feature sets
-  models.py                PositionMedianImputer, pipelines, nested CV, final refit
-  stats.py                 corrected t-test, Wilcoxon-Holm, Friedman, DeLong, bootstrap
+  models.py                PositionMedianImputer, OnFieldProjector, pipelines, nested CV, final refit
+  stats.py                 corrected t-test, Wilcoxon-Holm, Friedman, DeLong, bootstrap, mediation
   mlops.py                 MLflow tracking, tags, model registry
-  viz.py                   14 report figures
+  viz.py                   18 report figures
   pipeline.py              CLI orchestrator
-tests/                     18 pytest tests
+tests/                     25 pytest tests
 reports/metrics/           every table behind the report (CSV/JSON)
-reports/figures/           fig01 ... fig14
+reports/figures/           fig01 ... fig18
 mlflow.db, mlartifacts/    experiment store and model registry (in the release archive)
 ```
 
@@ -61,9 +80,9 @@ mlflow.db, mlartifacts/    experiment store and model registry (in the release a
 ```bash
 python -m pip install -r requirements.txt     # Python 3.13, pinned versions
 make relocate                                 # once, after extracting the archive (repoints MLflow paths)
-make test                                     # 18 unit tests, ~5 s
-make smoke                                    # whole pipeline on tiny grids, ~3 min
-make all                                      # release run, ~30 min on 2 cores
+make test                                     # 25 unit tests, ~5 s
+make smoke                                    # whole pipeline on tiny grids, ~5 min (own output folders)
+make all                                      # release run, ~45 min on 2 cores
 make ui                                       # MLflow UI: runs + registry
 ```
 
@@ -96,7 +115,9 @@ clf = mlflow.sklearn.load_model("models:/cgmt-starter-classifier@champion")
 - The Combine file holds drill **results**, not drill tracking, so "movement
   during drills" is measured by times and distances.
 - Tracking covers Week 18 and the playoffs of the 2024 and 2025 seasons, with 1–4
-  tracked players per play and no ball or opponents: separation and pass-rush win
-  rates cannot be computed, so the study uses individual kinematics.
+  tracked players per play and no ball or opponents, so the SBI uses individual kinematics.
+- `player_play` (v2.0) covers every game of 2023-2025 for 497 prospects; the on-field metrics
+  use regular-season, non-nullified plays only (240,412 rows). DBs get no on-field metric (the
+  file has no coverage outcome). "Expected" is the average of prospect plays in the same context.
 - The careers table covers seasons through 2025; start rate is normalised by the
   seasons each class has been in the league.

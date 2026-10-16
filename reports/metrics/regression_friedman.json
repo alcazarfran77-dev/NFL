@@ -46,5 +46,101 @@
         "xgboost": 1.9333333333333333
       }
     }
+  },
+  "dl_getoff": {
+    "rmse": {
+      "statistic": 21.480000000000018,
+      "p_value": 8.367574218335408e-05,
+      "rank_1_is": "best",
+      "mean_ranks": {
+        "position_mean": 3.4,
+        "ridge": 2.6666666666666665,
+        "random_forest": 1.2666666666666666,
+        "xgboost": 2.6666666666666665
+      }
+    },
+    "r2": {
+      "statistic": 21.480000000000018,
+      "p_value": 8.367574218335408e-05,
+      "rank_1_is": "best",
+      "mean_ranks": {
+        "position_mean": 3.4,
+        "ridge": 2.6666666666666665,
+        "random_forest": 1.2666666666666666,
+        "xgboost": 2.6666666666666665
+      }
+    }
+  },
+  "dl_pressure": {
+    "rmse": {
+      "statistic": 7.560000000000002,
+      "p_value": 0.056036672389856004,
+      "rank_1_is": "best",
+      "mean_ranks": {
+        "position_mean": 2.933333333333333,
+        "ridge": 2.6,
+        "random_forest": 1.7333333333333334,
+        "xgboost": 2.7333333333333334
+      }
+    },
+    "r2": {
+      "statistic": 7.560000000000002,
+      "p_value": 0.056036672389856004,
+      "rank_1_is": "best",
+      "mean_ranks": {
+        "position_mean": 2.933333333333333,
+        "ridge": 2.6,
+        "random_forest": 1.7333333333333334,
+        "xgboost": 2.7333333333333334
+      }
+    }
+  },
+  "ol_protection": {
+    "rmse": {
+      "statistic": 6.599999999999994,
+      "p_value": 0.085801087400123,
+      "rank_1_is": "best",
+      "mean_ranks": {
+        "position_mean": 2.466666666666667,
+        "ridge": 2.6,
+        "random_forest": 1.8666666666666667,
+        "xgboost": 3.066666666666667
+      }
+    },
+    "r2": {
+      "statistic": 6.599999999999994,
+      "p_value": 0.085801087400123,
+      "rank_1_is": "best",
+      "mean_ranks": {
+        "position_mean": 2.466666666666667,
+        "ridge": 2.6,
+        "random_forest": 1.8666666666666667,
+        "xgboost": 3.066666666666667
+      }
+    }
+  },
+  "wrte_separation": {
+    "rmse": {
+      "statistic": 6.759999999999991,
+      "p_value": 0.07995381606260309,
+      "rank_1_is": "best",
+      "mean_ranks": {
+        "position_mean": 3.1333333333333333,
+        "ridge": 2.1333333333333333,
+        "random_forest": 2.066666666666667,
+        "xgboost": 2.6666666666666665
+      }
+    },
+    "r2": {
+      "statistic": 6.759999999999991,
+      "p_value": 0.07995381606260309,
+      "rank_1_is": "best",
+      "mean_ranks": {
+        "position_mean": 3.1333333333333333,
+        "ridge": 2.1333333333333333,
+        "random_forest": 2.066666666666667,
+        "xgboost": 2.6666666666666665
+      }
+    }
   }
 }

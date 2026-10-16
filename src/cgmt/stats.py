@@ -149,13 +149,16 @@ def mediation_bootstrap(df: pd.DataFrame, x: str, m: str, y: str, n_boot: int, s
 
     a, b, total, direct = paths(z)
     rng = np.random.default_rng(seed)
-    boots = []
+    boots, directs = [], []
     for _ in range(n_boot):
         idx = rng.integers(0, len(z), len(z))
-        ba, bb, _, _ = paths(z[idx])
+        ba, bb, _, bd = paths(z[idx])
         boots.append(ba * bb)
+        directs.append(bd)
     lo, hi = np.percentile(boots, [2.5, 97.5])
+    dlo, dhi = np.percentile(directs, [2.5, 97.5])
     return {"n": len(d), "a_x_to_m": a, "b_m_to_y": b, "total_effect": total, "direct_effect": direct,
+            "direct_ci_low": dlo, "direct_ci_high": dhi,
             "indirect_effect": a * b, "indirect_ci_low": lo, "indirect_ci_high": hi,
             "share_mediated": (a * b) / total if abs(total) > 1e-9 else np.nan}
 

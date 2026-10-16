@@ -1,7 +1,7 @@
-# Model card — CGMT v1.0.1 (models trained in the v1.0.0 release run)
+# Model card — CGMT v2.0.0
 
 Release run: clean MLflow store `mlflow.db`, experiment `cgmt-combine-translation`,
-data_version `263d3909c68b`, seed 42. All scores are nested-CV out-of-sample
+data_version `dfc567c4ffe3` (seven raw files), seed 42. All scores are nested-CV out-of-sample
 (5 folds x 3 repeats) unless stated.
 
 ## Registered models
@@ -12,6 +12,11 @@ data_version `263d3909c68b`, seed 42. All scores are nested-CV out-of-sample
 | `cgmt-starter-classifier-movement@challenger` | P(starter) | 221 tracked players, + game movement | XGBoost | 400 trees, depth 3, lr 0.03, min child weight 3 | ROC-AUC 0.876 +/- 0.044 (no gain over 0.880 without movement) |
 | `cgmt-snap-burst-regressor@champion` | Snap Burst Index | 221 players, all positions | Ridge | alpha = 1000 | RMSE 9.88 vs 10.05 baseline; R^2 ~ 0 |
 | `cgmt-snap-burst-regressor-dl@champion` | Snap Burst Index | 54 defensive linemen | XGBoost | 200 trees, depth 3, lr 0.1, min child weight 3 | RMSE 8.54 vs 10.05 baseline; pooled R^2 0.29 [-0.02, 0.45] |
+| `cgmt-starter-classifier-onfield@challenger` (v2.0) | P(starter) | 255 players with an on-field index, + on-field performance | Random forest | 200 trees, depth 3, max features 0.33, min leaf 10 | ROC-AUC 0.874 +/- 0.057 (vs 0.867 without on-field) |
+| `cgmt-onfield-dl-getoff@champion` (v2.0) | DL get-off over expected (s) | 88 DL | Random forest | 200 trees, depth 3, max features 0.66, min leaf 3 | RMSE 0.060 vs 0.064 baseline; pooled R^2 0.13 [-0.02, 0.25] |
+| `cgmt-onfield-dl-pressure@champion` (v2.0) | DL pressure rate over expected | 89 DL | Random forest | 200 trees, depth 6, max features 0.33, min leaf 3 | No better than baseline (pooled R^2 0.05 [-0.13, 0.17]) |
+| `cgmt-onfield-ol-protection@champion` (v2.0) | OL pressure probability over expected | 70 OL | Random forest | 200 trees, depth 3, max features 0.33, min leaf 10 | No better than baseline (pooled R^2 -0.01) |
+| `cgmt-onfield-wrte-separation@champion` (v2.0) | WR/TE separation over expected (yd) | 96 WR/TE | Ridge | alpha = 100 | RMSE 0.169 vs 0.186 baseline; pooled R^2 0.19 [-0.01, 0.30] |
 
 Input: a pandas DataFrame with `combine_position` plus the feature columns of the
 chosen feature set (`cgmt.features.FEATURE_SETS`); the logged signature and input
@@ -23,9 +28,16 @@ example define the exact schema. Missing drills are allowed (imputed in-pipeline
   given his Combine profile and an expected draft slot. Decision support only.
 - **DL regressor:** projects a defensive lineman's in-game get-off (SBI) from his Combine
   profile; the gap between projected and observed SBI flags players to review on film.
+- **On-field regressors (v2.0):** project a prospect's season-long on-field performance from his
+  Combine profile; useful for DL get-off and WR/TE separation only. The DL-pressure and
+  OL-protection models are registered for completeness and do not beat the position mean.
 - **Not intended:** ranking WRs or DBs by snap burst (the metric is not a stable trait for
-  them in this data); any use of the movement challenger for draft decisions (its
-  features exist only after the draft).
+  them in this data); any use of the movement or on-field challengers for draft decisions
+  (their features exist only after the draft).
+- **Projector note:** the champion pipeline is unchanged by v2.0. The tested `combine_draft_proj`
+  set (stacked `OnFieldProjector`) did not beat Combine + draft (DeLong p >= 0.05), so it was not
+  promoted. In any pipeline that contains the projector, `onfield_target_*` inputs are training
+  labels only and may be passed as NaN at inference.
 
 ## Training data and target
 
@@ -39,7 +51,9 @@ example define the exact schema. Missing drills are allowed (imputed in-pipeline
   other feature); it partly encodes team investment, so it predicts opportunity as much as ability.
 - Small samples: 54 DL players, 14 DL starters; DL regression gains are consistent across folds
   (Wilcoxon, Holm p = 0.02) but not significant under the corrected resampled t-test (Holm p = 0.45).
-- Tracking covers late-season and playoff games only, with no opponents or play context.
+- Tracking covers late-season and playoff games only, with no opponents; on-field metrics cover
+  the 2023-2025 regular seasons, with "expected" computed from prospects' plays, not the league.
+- The on-field challenger is circular by design (performance and starts share seasons).
 - Pickled with cloudpickle (the pipeline contains a project transformer): load only from this
   trusted registry.
 

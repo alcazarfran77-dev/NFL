@@ -12,5 +12,20 @@
   "players_tracked": 279,
   "players_profiled": 221,
   "play_metric_anomalies": 58,
-  "seconds": 9.4
+  "pp_rows_in": 314197,
+  "pp_players": 497,
+  "pp_rows_not_regular_season": 64928,
+  "pp_rows_nullified": 8857,
+  "pp_get_off_out_of_range": 21,
+  "pp_rows_regular_season": 240412,
+  "onfield_plays_DL": 26980,
+  "onfield_plays_OL": 46492,
+  "onfield_plays_WRTE": 37816,
+  "players_with_goe": 88,
+  "players_with_proe": 89,
+  "players_with_ppoe": 70,
+  "players_with_paoe": 70,
+  "players_with_soe": 96,
+  "players_with_perf_index": 255,
+  "seconds": 14.1
 }

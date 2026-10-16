@@ -1,5 +1,5 @@
 {
-  "champion": {
+  "champion:cgmt-starter-classifier": {
     "population": "all_prospects",
     "feature_set": "combine_draft",
     "model": "xgboost",
@@ -12,9 +12,10 @@
       "model__reg_lambda": 1.0,
       "model__subsample": 0.8
     },
-    "inner_auc": 0.9143967680417546
+    "inner_auc": 0.9143967680417546,
+    "registered_as": "cgmt-starter-classifier@champion"
   },
-  "challenger": {
+  "challenger:cgmt-starter-classifier-movement": {
     "population": "tracked_subset",
     "feature_set": "combine_draft_mov",
     "model": "xgboost",
@@ -27,6 +28,20 @@
       "model__reg_lambda": 1.0,
       "model__subsample": 0.8
     },
-    "inner_auc": 0.8791575889615105
+    "inner_auc": 0.8791575889615105,
+    "registered_as": "cgmt-starter-classifier-movement@challenger"
+  },
+  "challenger:cgmt-starter-classifier-onfield": {
+    "population": "onfield_subset",
+    "feature_set": "combine_draft_perf",
+    "model": "random_forest",
+    "params": {
+      "model__max_depth": 3,
+      "model__max_features": 0.33,
+      "model__min_samples_leaf": 10,
+      "model__n_estimators": 200
+    },
+    "inner_auc": 0.875899470899471,
+    "registered_as": "cgmt-starter-classifier-onfield@challenger"
   }
 }

@@ -3,8 +3,8 @@
 Dep. Variable:             is_starter   No. Observations:                  221
 Model:                          Logit   Df Residuals:                      213
 Method:                           MLE   Df Model:                            7
-Date:                Thu, 15 Oct 2026   Pseudo R-squ.:                  0.4171
-Time:                        22:51:13   Log-Likelihood:                -86.099
+Date:                Fri, 16 Oct 2026   Pseudo R-squ.:                  0.4171
+Time:                        07:18:05   Log-Likelihood:                -86.099
 converged:                       True   LL-Null:                       -147.71
 Covariance Type:            nonrobust   LLR p-value:                 1.636e-23
 ==================================================================================

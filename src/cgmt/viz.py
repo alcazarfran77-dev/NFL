@@ -427,18 +427,20 @@ def fig_roc(cfg, oof, summary):
     axes = np.atleast_1d(axes)
     fig.subplots_adjust(left=0.06, right=0.99, top=0.8, bottom=0.12, wspace=0.25)
     for k, (ax, (pop, fsets)) in enumerate(zip(axes, exps)):
+        models = []
         for fs in fsets:
             s = summary[(summary.population == pop) & (summary.feature_set == fs)].sort_values("roc_auc_mean", ascending=False).iloc[0]
             o = oof[(oof.population == pop) & (oof.feature_set == fs) & (oof.model == s.model)]
             o = o.groupby("row").agg(y=("y", "first"), p=("pred", "mean"))
             fpr, tpr, _ = roc_curve(o.y, o.p)
+            models.append(LABELS[s.model])
             ax.plot(fpr, tpr, color=SET_COLORS[fs], linewidth=1.8,
-                    label=f"{LABELS[fs].replace(chr(10), ' ')} ({LABELS[s.model]}): {s.oof_auc:.2f} [{s.oof_auc_ci_low:.2f}, {s.oof_auc_ci_high:.2f}]")
+                    label=f"{LABELS[fs].replace(chr(10), ' ').replace('Combine + draft + ', '+ ')}: {s.oof_auc:.2f} [{s.oof_auc_ci_low:.2f}, {s.oof_auc_ci_high:.2f}]")
         ax.plot([0, 1], [0, 1], color=MUTED, linewidth=0.8, linestyle=(0, (4, 3)))
         ax.set_xlabel("False positive rate")
         ax.set_ylabel("True positive rate" if k == 0 else "")
-        ax.set_title(f"{chr(65 + k)}. {EXPERIMENT_TITLES[pop]}", fontsize=9.5)
-        ax.legend(loc="lower right", fontsize=6.5, title="ROC-AUC [95% CI]", title_fontsize=7)
+        ax.set_title(f"{chr(65 + k)}. {EXPERIMENT_TITLES[pop]} ({' / '.join(dict.fromkeys(models))})", fontsize=9.5)
+        ax.legend(loc="lower right", fontsize=7, title="ROC-AUC [95% CI]", title_fontsize=7)
     _title(fig, "Out-of-fold ROC curves of the best model per feature set",
            "Predictions averaged over the 3 CV repeats; brackets = bootstrap 95% CI (2,000 stratified resamples)")
     _save(fig, cfg, "fig12_roc_curves.png", "nested CV out-of-fold predictions")
@@ -464,7 +466,9 @@ def fig_importance(cfg, imp_clf, imp_reg, champ_clf_model, reg_champ, reg_pop="d
         ax.set_xlabel(f"Permutation importance ({u})")
         ax.set_title(title)
         ax.axvline(0, color=INK2, linewidth=0.8)
-    _title(fig, f"Draft pick dominates who starts; {_nice(imp_reg.iloc[0].feature)} leads for {reg_label.replace(' regressor', '')}",
+    lead = _nice(imp_reg.iloc[0].feature)
+    lead = lead[0].lower() + lead[1:] if len(lead) > 1 and lead[1].islower() else lead
+    _title(fig, f"Draft pick dominates who starts; {lead} leads for {reg_label.replace(' regressor', '')}",
            "Permutation importance on the refit champion models (in-sample, descriptive), 20 shuffles each; bars = mean, lines = SD")
     _save(fig, cfg, "fig13_feature_importance.png", "registered champion models")
 
@@ -619,8 +623,12 @@ def fig_onfield_regression(cfg, m_dir, summary, tasks):
         ax.set_xlim(-0.5, len(order) - 0.1)
         ax.set_ylim(-0.8, 0.8)
     axes[0].set_ylabel("Outer-fold R² (clipped at -0.8)")
-    g = best["dl_getoff"] if "dl_getoff" in best else next(iter(best.values()))
-    _title(fig, f"Combine testing predicts DL get-off (R² {g.r2_mean:+.2f}, {LABELS[g.name]}); pressure, protection and separation much less",
+    short = {"dl_getoff": "DL get-off", "dl_pressure": "DL pressure", "ol_protection": "OL protection",
+             "wrte_separation": "WR/TE separation"}
+    yes = [f"{short.get(k, k)} (R² {v.r2_mean:+.2f})" for k, v in best.items() if v.r2_mean > 0.05]
+    no = [short.get(k, k) for k, v in best.items() if v.r2_mean <= 0.05]
+    _title(fig, f"Combine testing predicts {' and '.join(yes)}; not {' or '.join(no)}" if yes and no else
+           "Combine testing vs on-field performance by family",
            "Nested CV, 5 folds x 3 repeats; dots = outer folds, marker = mean with 95% CI; blue = lowest-RMSE learned model")
     _save(fig, cfg, "fig18_onfield_regression.png", "Combine -> season-long on-field performance (player_play)")
 

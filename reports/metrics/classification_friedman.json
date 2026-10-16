@@ -19,6 +19,16 @@
       "xgboost": 1.7333333333333334
     }
   },
+  "all_prospects/combine_draft_proj": {
+    "statistic": 4.933333333333337,
+    "p_value": 0.08486727897001727,
+    "rank_1_is": "best",
+    "mean_ranks": {
+      "logistic_regression": 2.2,
+      "random_forest": 2.2666666666666666,
+      "xgboost": 1.5333333333333334
+    }
+  },
   "tracked_subset/combine_draft": {
     "statistic": 1.0508474576271167,
     "p_value": 0.5913047584123494,
@@ -37,6 +47,26 @@
       "logistic_regression": 2.1333333333333333,
       "random_forest": 2.2333333333333334,
       "xgboost": 1.6333333333333333
+    }
+  },
+  "onfield_subset/combine_draft": {
+    "statistic": 5.896551724137919,
+    "p_value": 0.05243002465934142,
+    "rank_1_is": "best",
+    "mean_ranks": {
+      "logistic_regression": 2.2,
+      "random_forest": 1.5,
+      "xgboost": 2.3
+    }
+  },
+  "onfield_subset/combine_draft_perf": {
+    "statistic": 1.2542372881355799,
+    "p_value": 0.5341286005221388,
+    "rank_1_is": "best",
+    "mean_ranks": {
+      "logistic_regression": 2.1333333333333333,
+      "random_forest": 1.7666666666666666,
+      "xgboost": 2.1
     }
   }
 }

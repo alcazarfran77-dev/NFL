@@ -14,6 +14,58 @@ the report can be traced to the exact code and data that produced it.
 Versions 0.1.0–0.3.0 were development steps made before the repository was initialised
 (first commit = 0.4.0); they are recorded so the reasoning behind each decision is not lost.
 
+## [2.0.0] - 2026-10-16
+
+MAJOR: a seventh raw file and new on-field targets. `data_version` changes, and the
+regression and classification tables gain rows. Every v1 number is reproduced unchanged
+(same SBI, same folds, same seed). The v1 rows are a subset of the v2 outputs.
+
+### Added
+- **`player_play_3.csv`** (314,197 player-plays, 497 prospects, 2023-2025 incl. preseason and
+  playoffs): schema-validated on the full 64-column header, loaded on 25 used columns,
+  hashed in the manifest, referential integrity checked against `combine_results` and `games`.
+- Business rules R10-R14 (`performance_rules` in the config): regular season only; plays
+  nullified by penalty removed; NGS get-off outside [0.30, 2.00) s blanked (21 plays);
+  minimum plays per family (DL 20 rush snaps, OL 50 pass-block snaps, WR/TE 30 routes);
+  DBs get no on-field metric (the file holds no coverage outcome).
+- `performance.py`: on-field metrics measured over expected for the play's context:
+  DL get-off and pressure rate (vs alignment), OL peak pressure probability and pressures
+  allowed (vs alignment x dropback quintile), WR/TE separation at the throw (vs route x alignment).
+  Empirical-Bayes shrinkage, reliability weights, within-family z-scores, a per-family index.
+- Translation analyses: on-field reliability (ICC), rookie-to-later stability, drill vs on-field
+  matrix with draft capital as reference, DL role check, mediation drill -> get-off -> pressure,
+  convergent validity of the tracking SBI against season-long get-off, context-adjusted tracking
+  reliability (closes v1 limitation 4), starter GLM with the on-field index.
+- Regression: four Combine -> on-field tasks (`regression.onfield_tasks`), each with the same
+  four models, nested CV, tests and a registered champion (`cgmt-onfield-<task>@champion`).
+- Classification: `combine_draft_proj` (pre-draft safe: a stacked `OnFieldProjector` learns
+  Combine -> on-field inside each training fold, out-of-fold for training rows, labels never
+  read at prediction time) and `combine_draft_perf` (observed on-field performance, diagnostic),
+  registered as `cgmt-starter-classifier-onfield@challenger`. The champion switches to the
+  projector set only if it beats Combine + draft on mean AUC with DeLong p < 0.05.
+- Figures 15-18; figures 11-13 generalized to any set of experiments.
+- 7 tests (`tests/test_onfield.py`): R10-R13, over-expected centering, projector never reading
+  labels at prediction time, out-of-fold training projections, imputer exclusion, pipeline fit.
+
+### Release notes
+- Trained from a clean MLflow store: 54 runs tagged `git_commit = 5f30906`, `pipeline_version = 2.0.0`,
+  `data_version = dfc567c4ffe3`; 9 registered models (4 new on-field regressors, 1 new challenger).
+- After training: `mediation_bootstrap` also reports a bootstrap CI for the direct path (same
+  resamples, so the indirect CIs are unchanged) and the translation stage was re-run; figure
+  titles/legends were fixed (fig12 legend, fig13 wording, fig18 title now data-driven) and re-rendered.
+- Verified: DL get-off random forest, projector logistic and on-field logistic re-runs reproduce
+  their saved outer-fold scores exactly; every v1 number reproduces unchanged.
+- Results: drills forecast DL get-off (rho 0.36-0.43) and get-off mediates ~half of the drill ->
+  pressure link; Combine models reach pooled R^2 0.13 (DL get-off) and 0.19 (WR/TE separation),
+  none for DL pressure or OL protection; the projector does not improve the starter champion
+  (DeLong p >= 0.05) so it is not promoted; observed on-field performance adds +0.004 to +0.009 AUC.
+
+### Changed
+- Smoke config writes to `data/smoke/` and `reports/smoke/`, so it can never overwrite release outputs.
+- `Config.path` creates the parent folder of file paths (manifest).
+- Regression stage refactored into one `_regress` routine shared by SBI and on-field tasks;
+  `regression_summary.csv` gains a `target` column; the SBI translation gap keeps `predicted_sbi`.
+
 ## [1.0.1] - 2026-10-15
 
 ### Added

@@ -4,7 +4,9 @@
     "params": {
       "model__alpha": 1000.0
     },
-    "inner_rmse": 9.840703606786834
+    "inner_rmse": 9.840703606786834,
+    "target": "sbi",
+    "registered_as": "cgmt-snap-burst-regressor"
   },
   "defensive_line": {
     "model": "xgboost",
@@ -17,6 +19,53 @@
       "model__reg_lambda": 1.0,
       "model__subsample": 0.8
     },
-    "inner_rmse": 8.37747158639185
+    "inner_rmse": 8.37747158639185,
+    "target": "sbi",
+    "registered_as": "cgmt-snap-burst-regressor-dl"
+  },
+  "dl_getoff": {
+    "model": "random_forest",
+    "params": {
+      "model__max_depth": 3,
+      "model__max_features": 0.66,
+      "model__min_samples_leaf": 3,
+      "model__n_estimators": 200
+    },
+    "inner_rmse": 0.060080733243220864,
+    "target": "goe_eb",
+    "registered_as": "cgmt-onfield-dl-getoff"
+  },
+  "dl_pressure": {
+    "model": "random_forest",
+    "params": {
+      "model__max_depth": 6,
+      "model__max_features": 0.33,
+      "model__min_samples_leaf": 3,
+      "model__n_estimators": 200
+    },
+    "inner_rmse": 0.011548632616090165,
+    "target": "proe_eb",
+    "registered_as": "cgmt-onfield-dl-pressure"
+  },
+  "ol_protection": {
+    "model": "random_forest",
+    "params": {
+      "model__max_depth": 3,
+      "model__max_features": 0.33,
+      "model__min_samples_leaf": 10,
+      "model__n_estimators": 200
+    },
+    "inner_rmse": 0.017843213386326107,
+    "target": "ppoe_eb",
+    "registered_as": "cgmt-onfield-ol-protection"
+  },
+  "wrte_separation": {
+    "model": "ridge",
+    "params": {
+      "model__alpha": 100.0
+    },
+    "inner_rmse": 0.1778241746114695,
+    "target": "soe_eb",
+    "registered_as": "cgmt-onfield-wrte-separation"
   }
 }

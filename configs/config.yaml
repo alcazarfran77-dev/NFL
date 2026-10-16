@@ -83,7 +83,7 @@ performance_rules:                 # v2.0.0: on-field performance from player_pl
     OL: OL
     WR: WRTE
     TE: WRTE
-  get_off_valid_s: [0.30, 2.00]    # NGS get-off outside this range = tracking artefact (0.006% of rush snaps)
+  get_off_valid_s: [0.30, 2.00]    # NGS get-off outside this range = tracking artefact (21 regular-season plays, < 0.1%)
   dropback_quantiles: 5            # OL expectation: alignment x dropback-duration quintile
   min_plays:                       # minimum qualifying plays for a player-level metric
     dl_rush: 20
