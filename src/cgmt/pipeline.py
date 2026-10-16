@@ -163,9 +163,10 @@ def stage_data(cfg: Config) -> dict:
     prospects, audit = build_prospects(tables, cfg)
     ct_audit = {}
     if "combine_tracking" in tables:  # v2.1.0, spec File 3 (optional)
-        attempts, ct_feats, ct_audit = combine_tracking.build(tables["combine_tracking"], prospects, cfg)
+        attempts, ct_feats, ct_rel, ct_audit = combine_tracking.build(tables["combine_tracking"], prospects, cfg)
         _save(attempts, cfg, "combine_tracking_attempts.parquet")
         _save(ct_feats, cfg, "combine_tracking_features.parquet")
+        _save(ct_rel, cfg, "ct_reliability.csv", key="metrics")
         prospects = prospects.merge(ct_feats, on="nfl_id", how="left", validate="1:1")
         log.info("combine tracking: %s", ct_audit)
     _save(prospects, cfg, "prospects.parquet")

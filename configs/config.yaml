@@ -22,7 +22,7 @@ raw_files:                         # v2.1.0: names or glob patterns (docs/Data_s
   games: games.csv
   tracking: "game_tracking_*.csv"    # spec: game_tracking_2023/2024/2025.csv; also split parts (_2024_2)
   player_play: "player_play*.csv"    # spec: player_play.csv; delivered as player_play_3.csv (v2.0.0)
-  combine_tracking: "combine_tracking*.csv"   # spec File 3, optional: Combine drill tracking (v2.1.0)
+  combine_tracking: "combine_tracking*.csv"   # spec File 3: Combine drill tracking (delivered as combine_tracking_6.csv, v2.2.0)
                                      # a part <stem>_<n>.csv is ignored when the full <stem>.csv is present
 
 contract:
@@ -105,7 +105,7 @@ performance_rules:                 # v2.0.0: on-field performance from player_pl
     OL: ppoe
     WRTE: soe
 
-combine_tracking_rules:            # v2.1.0 R16, spec File 3 (used only when combine_tracking.csv is present)
+combine_tracking_rules:            # v2.1.0 R16, spec File 3; delivered in v2.2.0 as combine_tracking_6.csv
   frame_rate_hz: 10
   start_speed: 0.5                 # yd/s: the attempt starts at the frame before the first frame at this speed
   min_frames: 15                   # attempts shorter than 1.5 s after the start are dropped
@@ -114,6 +114,7 @@ combine_tracking_rules:            # v2.1.0 R16, spec File 3 (used only when com
   plant_drop: 0.5                  # a plant = a speed minimum below 50% of the preceding peak (3-cone, shuttle)
   cut_window_s: 0.5
   cut_min_speed: 2.0
+  min_reliability: 0.5             # v2.2.0: a drill metric becomes a feature only if it repeats at r >= 0.5
 
 cv:
   outer_splits: 5

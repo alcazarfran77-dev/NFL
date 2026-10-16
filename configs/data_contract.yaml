@@ -238,3 +238,8 @@ handling:
   tracking.*.superseded_part: "A split part is ignored when the full season file is present."
   player_play.*.superseded_part: "A split part is ignored when the full file is present."
   combine_tracking.*.file_present: "Not delivered. cgmt.combine_tracking and its feature sets switch on when the file is added."
+  combine_tracking.y.range: "The 40-yard dash runs in a lane outside the field's 0-53.3 yd frame (most out-of-range frames). Metrics use displacement and speed, not position."
+  combine_tracking.s.range: "Ball rows only (thrown passes in position drills); ball rows are dropped by R16."
+  combine_tracking.a.range: "Ball rows only; ball rows are dropped by R16."
+  combine_tracking.dis.range: "Ball rows only; dis is not used."
+  combine_tracking.*.superseded_part: "A split part is ignored when the full file is present."

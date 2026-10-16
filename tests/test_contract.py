@@ -3,7 +3,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from cgmt.combine_tracking import CT_FEATURES, attempt_metrics, build, clean_combine_tracking, player_features
+from cgmt.combine_tracking import (CT_FEATURES, attempt_metrics, attempt_reliability, build, clean_combine_tracking,
+                                   player_features)
 from cgmt.config import Config
 from cgmt.contract import load_contract, validate_frame
 from cgmt.data import resolve_files
@@ -121,6 +122,10 @@ def test_forty_split_matches_constant_acceleration_kinematics():
     k = np.flatnonzero(disp >= 10)[0]
     expected = (k - 1 + (10 - disp[k - 1]) / (disp[k] - disp[k - 1])) / 10
     assert row.split_10yd_s == pytest.approx(expected, abs=1e-9)
+    t = {m: (np.flatnonzero(disp >= m)[0] - 1 + (m - disp[np.flatnonzero(disp >= m)[0] - 1])
+             / (disp[np.flatnonzero(disp >= m)[0]] - disp[np.flatnonzero(disp >= m)[0] - 1])) / 10 for m in (5, 10, 20)}
+    assert row.split_5_10_s == pytest.approx(t[10] - t[5], abs=1e-9)
+    assert row.split_10_20_s == pytest.approx(t[20] - t[10], abs=1e-9)
     assert row.top_speed == pytest.approx(top)
     assert row.burst_2s == pytest.approx(disp[20])
     assert np.isnan(row.n_plants)
@@ -135,15 +140,35 @@ def test_shuttle_plants_and_best_attempt_aggregation():
             + _attempt("f1", 8, "FORTY_YARD_DASH", "FORTY", np.minimum(np.arange(1, 61) * 0.4, 9.5))
             + _attempt("k1", 7, "SKILL_DRILLS_DL", "GAUNTLET_DRILL", [3, 5, 6, 6, 6, 6, 5, 3, 2, 2, 2, 2, 2, 2, 2, 2])
             + _attempt("k2", 8, "SKILL_DRILLS_DL", "GAUNTLET_DRILL", [2, 3, 4, 4, 4, 4, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2]))
-    attempts, feats, audit = build(pd.DataFrame(rows), pd.DataFrame({"nfl_id": [7, 8, 9]}), _cfg())
+    attempts, feats, rel, audit = build(pd.DataFrame(rows), pd.DataFrame({"nfl_id": [7, 8, 9]}), _cfg())
     shuttle = attempts[attempts.drill_group == "shuttle"].set_index("event_id")
     assert (shuttle.n_plants >= 2).all() and shuttle.plant_speed_ratio.between(0, 0.5).all()
     f = feats.set_index("nfl_id")
     assert list(f.index) == [7, 8, 9] and set(CT_FEATURES) <= set(f.columns)
     # best attempt = the faster (unscaled) shuttle
-    assert f.loc[7, "ct_shuttle_peak_accel"] == pytest.approx(shuttle.peak_accel.max())
+    assert f.loc[7, "ct_shuttle_plant_speed_ratio"] == pytest.approx(shuttle.plant_speed_ratio.max())
     assert f.loc[7, "ct_skill_speed_z"] > f.loc[8, "ct_skill_speed_z"]
     assert f.loc[9, "ct_missing"] == 1 and f.loc[9, "ct_attempts"] == 0
-    assert np.isnan(f.loc[7, "ct_forty_split_10yd_s"]) and not np.isnan(f.loc[8, "ct_forty_split_10yd_s"])
+    assert np.isnan(f.loc[7, "ct_forty_split_5_10_s"]) and not np.isnan(f.loc[8, "ct_forty_split_5_10_s"])
+    assert set(rel.drill_group) == {"forty", "3cone", "shuttle", "skill"}
     assert has_combine_tracking(f.reset_index())
     assert not has_combine_tracking(pd.DataFrame({"nfl_id": [1]}))
+
+
+def test_reliability_gate_separates_repeatable_from_noisy_metrics():
+    """A metric that repeats across a player's attempts passes the gate; pure noise does not."""
+    rng = np.random.default_rng(1)
+    rows = []
+    for pid in range(60):
+        talent = rng.normal()
+        for att in (1, 2):
+            rows.append({"nfl_id": pid, "attempt": att, "drill_group": "forty", "drill_name": "FORTY",
+                         "split_5_10_s": 0.75 - 0.03 * talent + rng.normal(0, 0.005),   # repeatable
+                         "split_0_5_s": rng.normal(1.3, 0.1)})                           # start noise
+    att = pd.DataFrame(rows)
+    for m in ["split_10_20_s", "split_10yd_s", "top_speed", "peak_accel", "burst_1s", "burst_2s", "t90_top_s"]:  # noise
+        att[m] = rng.normal(size=len(att))
+    rel = attempt_reliability(att).query("drill_group == 'forty'").set_index("metric")
+    assert rel.loc["split_5_10_s", "passes_gate"] and rel.loc["split_5_10_s", "reliability"] > 0.9
+    assert not rel.loc["split_0_5_s", "passes_gate"]
+    assert rel.loc["split_5_10_s", "feature"] == "ct_forty_split_5_10_s"

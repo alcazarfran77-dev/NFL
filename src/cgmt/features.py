@@ -46,14 +46,14 @@ FEATURE_SETS["combine_draft_proj"] = FEATURE_SETS["combine_draft"] + PROJECTOR_T
 FEATURE_SETS["combine_draft_perf"] = FEATURE_SETS["combine_draft"] + PERF_FEATURES
 
 # v2.1.0 Combine drill tracking (used only when the file is present).
-CT_SET = CT_FEATURES + ["ct_missing"]
+CT_SET = list(CT_FEATURES)
 ATHLETIC_CT = ATHLETIC + CT_SET
 FEATURE_SETS["combine_draft_ct"] = FEATURE_SETS["combine_draft"] + CT_SET
 
 
 def has_combine_tracking(prospects: pd.DataFrame) -> bool:
     """True when the prospects table carries drill-tracking features for at least one player."""
-    return all(c in prospects.columns for c in CT_SET) and bool((prospects["ct_missing"] == 0).any())
+    return all(c in prospects.columns for c in CT_SET + ["ct_missing"]) and bool((prospects["ct_missing"] == 0).any())
 
 
 def regression_table(prospects: pd.DataFrame, profiles: pd.DataFrame, target: str) -> pd.DataFrame:

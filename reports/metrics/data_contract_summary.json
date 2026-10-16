@@ -18,16 +18,13 @@
     "tracking": [
       "game_tracking_2024_2.csv",
       "game_tracking_2025_2.csv"
+    ],
+    "combine_tracking": [
+      "combine_tracking_6.csv"
     ]
   },
   "superseded_files": {},
-  "missing_files": [
-    {
-      "table": "combine_tracking",
-      "spec_name": "combine_tracking.csv",
-      "required": false
-    }
-  ],
+  "missing_files": [],
   "coverage": {
     "tracking": {
       "seasons": [
@@ -46,8 +43,8 @@
       "expected_players": 510
     }
   },
-  "n_checks": 332,
+  "n_checks": 370,
   "n_errors": 0,
-  "n_warnings": 23,
+  "n_warnings": 26,
   "status": "pass_with_warnings"
 }

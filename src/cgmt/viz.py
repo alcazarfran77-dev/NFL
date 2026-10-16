@@ -52,6 +52,10 @@ LABELS = {
     "onfield_target_ppoe": "Projected protection", "onfield_target_soe": "Projected separation",
     "combine_draft_proj": "Combine + draft\n+ projected on-field", "combine_draft_perf": "Combine + draft\n+ on-field performance",
     "combine": "Combine only", "combine_draft": "Combine + draft", "combine_draft_mov": "Combine + draft\n+ game movement",
+    "combine_draft_ct": "Combine + draft\n+ drill tracking",
+    "ct_forty_split_5_10_s": "40: 5-10 yd split (tracking)", "ct_forty_top_speed": "40: top speed (tracking)",
+    "ct_shuttle_plant_speed_ratio": "Shuttle: speed kept in turns", "ct_skill_speed_z": "Position drills: top speed",
+    "ct_skill_accel_z": "Position drills: acceleration",
 }
 
 
@@ -378,11 +382,11 @@ def fig_regression_cv(cfg, m_dir, summary):
 
 EXPERIMENT_TITLES = {"all_prospects": "All prospects", "tracked_subset": "Players with tracking",
                      "onfield_subset": "Players with on-field metrics"}
-EXPERIMENT_SETS = {"all_prospects": ["combine", "combine_draft", "combine_draft_proj"],
+EXPERIMENT_SETS = {"all_prospects": ["combine", "combine_draft", "combine_draft_proj", "combine_draft_ct"],
                    "tracked_subset": ["combine_draft", "combine_draft_mov"],
                    "onfield_subset": ["combine_draft", "combine_draft_perf"]}
 SET_COLORS = {"combine": MUTED, "combine_draft": INK2, "combine_draft_proj": ORANGE, "combine_draft_mov": ACCENT,
-              "combine_draft_perf": ACCENT}
+              "combine_draft_perf": ACCENT, "combine_draft_ct": AQUA}
 
 
 def _experiments(folds):
@@ -415,10 +419,12 @@ def fig_classification_auc(cfg, folds, summary):
     axes[0].set_ylabel("ROC-AUC, outer folds (mean, 95% CI)")
     g = folds.groupby(["population", "feature_set"]).roc_auc.mean()
     t = f"Draft capital lifts AUC from {g[('all_prospects', 'combine')]:.2f} to {g[('all_prospects', 'combine_draft')]:.2f}"
+    if ("all_prospects", "combine_draft_ct") in g.index:
+        t += f"; drill tracking adds {g[('all_prospects', 'combine_draft_ct')] - g[('all_prospects', 'combine_draft')]:+.3f}"
     if ("onfield_subset", "combine_draft_perf") in g.index:
-        t += f"; on-field performance adds {g[('onfield_subset', 'combine_draft_perf')] - g[('onfield_subset', 'combine_draft')]:+.3f}"
+        t += f"; on-field performance {g[('onfield_subset', 'combine_draft_perf')] - g[('onfield_subset', 'combine_draft')]:+.3f}"
     _title(fig, t, "Predicting a starter (started 50%+ of available games); nested CV, 5 folds x 3 repeats; same folds within a panel")
-    _save(fig, cfg, "fig11_classification_auc.png", "players + combine_results + player_career_successes + player_play")
+    _save(fig, cfg, "fig11_classification_auc.png", "players + combine_results + combine_tracking + player_career_successes + player_play")
 
 
 def fig_roc(cfg, oof, summary):
@@ -633,6 +639,150 @@ def fig_onfield_regression(cfg, m_dir, summary, tasks):
     _save(fig, cfg, "fig18_onfield_regression.png", "Combine -> season-long on-field performance (player_play)")
 
 
+# ----------------------------------------------------------------------------- Combine drill tracking (v2.2.0)
+CT_GROUP_TITLES = {"forty": "40-yard dash", "3cone": "3-cone", "shuttle": "Short shuttle", "skill": "Position drills"}
+CT_METRIC_NAMES = {"split_0_5_s": "0-5 yd split", "split_5_10_s": "5-10 yd split", "split_10_20_s": "10-20 yd split",
+                   "split_10yd_s": "10-yd split from the start", "top_speed": "Top speed", "peak_accel": "Peak acceleration",
+                   "burst_1s": "Distance at 1 s", "burst_2s": "Distance at 2 s", "t90_top_s": "Time to 90% of top speed",
+                   "duration_s": "Drill time", "peak_decel": "Peak braking", "plant_speed_ratio": "Speed kept in turns",
+                   "max_cut_deg": "Sharpest cut"}
+
+
+def fig_ct_reliability(cfg, rel):
+    """Which drill-tracking metrics repeat within a player (the gate that picks the features)."""
+    order = ["forty", "skill", "shuttle", "3cone"]
+    rel = rel.copy()
+    rel["g"] = rel.drill_group.map({g: i for i, g in enumerate(order)})
+    rel = rel.sort_values(["g", "reliability"], ascending=[True, True])
+    rel["feature"] = rel["feature"].fillna("").astype(str)
+    fig, ax = plt.subplots(figsize=(10.5, 8.6))
+    fig.subplots_adjust(left=0.33, right=0.95, top=0.83, bottom=0.08)
+    y, ticks, labels, seps = 0, [], [], []
+    for g in order[::-1]:
+        sub = rel[rel.drill_group == g]
+        for r in sub.itertuples():
+            col = ACCENT if r.feature else (INK2 if bool(r.passes_gate) else MUTED)
+            ax.barh(y, max(r.reliability, 0), color=col, height=0.7)
+            lab = f"{r.reliability:.3f}" if abs(r.reliability - 0.5) < 0.005 else f"{r.reliability:.2f}"
+            ax.text(max(r.reliability, 0) + 0.015, y, lab, va="center", fontsize=8, color=INK)
+            ticks.append(y)
+            labels.append(f"{CT_METRIC_NAMES.get(r.metric, r.metric)}")
+            y += 1
+        ax.text(-0.02, y - 0.35, f"{CT_GROUP_TITLES[g]} (n = {int(sub.n_players.max())} players)", transform=ax.get_yaxis_transform(),
+                ha="right", va="bottom", fontsize=8.5, fontweight="bold", color=INK)
+        seps.append(y - 0.5)
+        y += 1.2
+    ax.axvline(0.5, color=INK2, linewidth=1, linestyle=(0, (3, 3)))
+    ax.text(0.505, y - 0.6, "gate r = 0.5", fontsize=8, color=INK2, va="top")
+    ax.set_yticks(ticks, labels, fontsize=8.5)
+    ax.set_xlim(0, 1.08)
+    ax.set_ylim(-0.8, y - 0.4)
+    ax.set_xlabel("Reliability (test-retest r; split-half with Spearman-Brown for position drills)")
+    ax.grid(axis="y", visible=False)
+    from matplotlib.patches import Patch
+    fig.legend(handles=[Patch(color=ACCENT, label="Model feature"), Patch(color=INK2, label="Repeats, but another metric covers it"),
+                        Patch(color=MUTED, label="Below the gate: not used")], loc="upper left", bbox_to_anchor=(0.33, 0.885),
+               ncol=3, fontsize=8.5, frameon=False)
+    f = rel.set_index(["drill_group", "metric"])
+    _title(fig, f"Splits between distance marks repeat (5-10 yd r = {f.loc[('forty', 'split_5_10_s'), 'reliability']:.2f}); "
+                f"the tracked start does not (0-5 yd r = {f.loc[('forty', 'split_0_5_s'), 'reliability']:.2f})",
+           "How well each drill-tracking metric repeats within a player; a metric at r >= 0.5 can become a feature, one per construct")
+    _save(fig, cfg, "fig19_ct_reliability.png", "combine_tracking_6.csv: 6,310 drill attempts, 510 prospects")
+
+
+def _ci_from_t(mean_diff, t, df, level=0.95):
+    from scipy import stats
+    se = abs(mean_diff / t) if t and np.isfinite(t) and t != 0 else np.nan
+    return se * stats.t.ppf(0.5 + level / 2, df)
+
+
+def fig_ct_value(cfg, m_dir, reg, clf_tests, delong, n_folds):
+    """Does drill tracking improve out-of-sample prediction? Same rows and folds, with vs without."""
+    comp = pd.read_csv(m_dir / "regression_ct_comparison.csv")
+    names = {"defensive_line": "DL snap burst (SBI)", "dl_getoff": "DL get-off over expected",
+             "dl_pressure": "DL pressure over expected", "ol_protection": "OL protection over expected",
+             "wrte_separation": "WR/TE separation over expected"}
+    rows = []
+    for pop in [p for p in names if p in set(comp.population)]:
+        s = reg[(reg.population == pop) & (reg.model != "position_mean")].sort_values("rmse_mean")
+        champ = s.iloc[0].model
+        c = comp[(comp.population == pop) & (comp.model == champ) & (comp.metric == "r2")].iloc[0]
+        rows.append({"label": f"{names[pop]}\n({LABELS[champ]})", "d": c.mean_diff_a_minus_b,
+                     "half": _ci_from_t(c.mean_diff_a_minus_b, c.t_corrected, n_folds - 1), "p": c.p_corrected_t})
+    r1 = pd.DataFrame(rows)
+    t = clf_tests[(clf_tests.comparison == "feature_set_vs_feature_set") & clf_tests.feature_set.str.startswith("combine_draft_ct vs combine_draft")]
+    rows = []
+    for m in ["logistic_regression", "random_forest", "xgboost"]:
+        c = t[t.feature_set.str.contains(f"({m})", regex=False)].iloc[0]
+        dl = delong[(delong.feature_set_1 == "combine_draft_ct") & (delong.model == m)]
+        rows.append({"label": LABELS[m], "d": c.mean_diff_a_minus_b, "half": _ci_from_t(c.mean_diff_a_minus_b, c.t_corrected, n_folds - 1),
+                     "p": c.p_corrected_t, "p_delong": float(dl.p_value.iloc[0]) if len(dl) else np.nan})
+    r2 = pd.DataFrame(rows)
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(11.5, 4.9), gridspec_kw={"width_ratios": [1.35, 1]})
+    fig.subplots_adjust(left=0.2, right=0.97, top=0.78, bottom=0.15, wspace=0.45)
+    for ax, r, xl, title in [(a1, r1, "Change in outer-fold R² (with - without drill tracking)", "A. Combine -> game metrics (best model per task)"),
+                             (a2, r2, "Change in outer-fold ROC-AUC", "B. Starter classifier, Combine + draft")]:
+        yy = np.arange(len(r))[::-1]
+        for yi, row in zip(yy, r.itertuples()):
+            sig = row.p < 0.05
+            col = ACCENT if sig and row.d > 0 else (ORANGE if sig else INK2)
+            ax.errorbar(row.d, yi, xerr=row.half, fmt="o", color=col, ecolor=col, capsize=3, markersize=7, elinewidth=1.6)
+            ax.text(row.d, yi + 0.22, f"{row.d:+.3f}  (p = {row.p:.2f})", ha="center", fontsize=7.8, color=INK)
+        ax.axvline(0, color=INK2, linewidth=0.9)
+        ax.set_yticks(yy, r.label, fontsize=8.5)
+        ax.set_ylim(-0.6, len(r) - 0.3)
+        ax.set_xlabel(xl, fontsize=8.5)
+        ax.set_title(title, fontsize=9.5)
+        lim = float(np.nanmax(np.abs(r.d) + r.half.fillna(0))) * 1.15
+        ax.set_xlim(-lim, lim)
+        ax.grid(axis="y", visible=False)
+    sig_up = [l.split(chr(10))[0] for l, d, p in zip(r1.label, r1.d, r1.p) if p < 0.05 and d > 0]
+    best_auc = r2.d.max()
+    head = (f"Drill tracking improves {', '.join(sig_up)}" if sig_up else "Drill tracking does not significantly improve any Combine -> game prediction")
+    _title(fig, f"{head}; starter AUC change {r2.d.min():+.3f} to {best_auc:+.3f}",
+           f"Same players and folds with and without the 5 drill-tracking features; mean over {n_folds} outer folds, 95% CI from the corrected resampled t-test")
+    _save(fig, cfg, "fig20_ct_value.png", "nested CV, regression_ct_comparison.csv + classification_pairwise_tests.csv")
+
+
+def fig_ct_translation(cfg, mat):
+    from .combine_tracking import CT_FEATURES
+    ys = ["goe_eb", "proe_eb", "ppoe_eb", "paoe_eb", "soe_eb"]
+    m = mat.set_index(["x", "y"])
+    rho = np.array([[m.loc[(x, y), "rho"] if (x, y) in m.index else np.nan for y in ys] for x in CT_FEATURES])
+    q = np.array([[m.loc[(x, y), "q_value"] if (x, y) in m.index else np.nan for y in ys] for x in CT_FEATURES])
+    fig, ax = plt.subplots(figsize=(9.5, 4.6))
+    fig.subplots_adjust(left=0.3, right=0.98, top=0.7, bottom=0.14)
+    ax.imshow(rho, cmap=DIVERGING, vmin=-0.45, vmax=0.45, aspect="auto")
+    for i in range(len(CT_FEATURES)):
+        for j in range(len(ys)):
+            if np.isfinite(rho[i, j]):
+                sig = q[i, j] < 0.05
+                ax.text(j, i, f"{rho[i, j]:+.2f}{'*' if sig else ''}", ha="center", va="center", fontsize=9,
+                        color=INK, fontweight="bold" if sig else "normal")
+    ax.set_xticks(range(len(ys)), [LABELS[y] for y in ys], fontsize=8.5)
+    ax.xaxis.tick_top()
+    ax.set_yticks(range(len(CT_FEATURES)), [LABELS[x] for x in CT_FEATURES], fontsize=9)
+    ax.grid(False)
+    ax.tick_params(length=0)
+    for s_ in ax.spines.values():
+        s_.set_visible(False)
+    short_x = {"ct_forty_split_5_10_s": "40 acceleration (5-10 yd)", "ct_forty_top_speed": "40 top speed",
+               "ct_shuttle_plant_speed_ratio": "shuttle turns", "ct_skill_speed_z": "position-drill top speed",
+               "ct_skill_accel_z": "position-drill acceleration"}
+    short_y = {"goe_eb": "DL get-off", "proe_eb": "DL pressure", "ppoe_eb": "OL protection", "paoe_eb": "OL pressures allowed",
+               "soe_eb": "WR/TE separation"}
+    sig = mat[(mat.q_value < 0.05) & mat.x.isin(CT_FEATURES) & mat.y.isin(ys)].sort_values("rho", key=np.abs, ascending=False)
+    if len(sig):
+        g = sig.iloc[0]
+        t = f"Drill tracking links most to {short_y[g.y]}: {short_x[g.x]} rho {g.rho:+.2f}"
+        t += f"; {len(sig) - 1} other cell{'s' if len(sig) != 2 else ''} pass FDR" if len(sig) > 1 else "; no other cell passes FDR"
+    else:
+        t = "No drill-tracking feature links to on-field performance after FDR correction"
+    _title(fig, t, "Within-position Spearman rho, drill-tracking feature vs season-long on-field metric (* = FDR q < 0.05); split time sign-flipped")
+    fig.text(0.3, 0.04, "Blue = better drill movement goes with better on-field performance; orange = the reverse.", fontsize=8, color=INK2)
+    _save(fig, cfg, "fig21_ct_onfield_translation.png", "combine_tracking_6.csv + player_play regular season 2023-2025")
+
+
 def make_all_figures(cfg: Config) -> None:
     _style()
     p, m, i = cfg.path("processed"), cfg.path("metrics"), cfg.path("interim")
@@ -670,6 +820,15 @@ def make_all_figures(cfg: Config) -> None:
         tasks = [t for t in cfg["regression"].get("onfield_tasks", []) if t["name"] in set(reg.population)]
         if tasks:
             fig_onfield_regression(cfg, m, reg, tasks)
+    if (m / "ct_reliability.csv").exists():
+        fig_ct_reliability(cfg, pd.read_csv(m / "ct_reliability.csv"))
+    if (m / "ct_onfield_translation_matrix.csv").exists():
+        fig_ct_translation(cfg, pd.read_csv(m / "ct_onfield_translation_matrix.csv"))
+    if (m / "regression_ct_comparison.csv").exists() and (m / "classification_delong.csv").exists():
+        tests = pd.read_csv(m / "classification_pairwise_tests.csv")
+        if tests.feature_set.astype(str).str.startswith("combine_draft_ct vs").any():
+            fig_ct_value(cfg, m, pd.read_csv(m / "regression_summary.csv"), tests, pd.read_csv(m / "classification_delong.csv"),
+                         cfg["cv"]["outer_splits"] * cfg["cv"]["outer_repeats"])
     if (m / "classification_summary.csv").exists():
         clf = pd.read_csv(m / "classification_summary.csv")
         fig_classification_auc(cfg, pd.read_csv(m / "classification_fold_scores.csv"), clf)
