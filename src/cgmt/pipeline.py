@@ -419,11 +419,14 @@ def stage_stats(cfg: Config) -> None:
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description="CGMT pipeline")
     ap.add_argument("--config", default=None)
-    ap.add_argument("--stage", default="all", choices=["all", "data", "translation", "models", "stats", "figures"])
+    ap.add_argument("--stage", default="all", choices=["all", "data", "translation", "models", "stats", "figures", "relocate"])
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     cfg = load_config(args.config)
     set_global_seed(cfg.seed)
+    if args.stage == "relocate":
+        log.info("relocate: %d MLflow store cells now point at this checkout", mlops.relocate_store(cfg))
+        return
     mlops.setup(cfg)
     log.info("CGMT v%s seed=%d", __version__, cfg.seed)
 

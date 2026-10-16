@@ -1,4 +1,4 @@
-# Model card — CGMT v1.0.0
+# Model card — CGMT v1.0.1 (models trained in the v1.0.0 release run)
 
 Release run: clean MLflow store `mlflow.db`, experiment `cgmt-combine-translation`,
 data_version `263d3909c68b`, seed 42. All scores are nested-CV out-of-sample

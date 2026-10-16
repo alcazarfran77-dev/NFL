@@ -81,6 +81,42 @@ def log_cv_result(res, extra_params: dict | None = None) -> None:
     mlflow.log_text(pd.DataFrame(res.best_params).to_csv(index=False), "cv/selected_hyperparameters.csv")
 
 
+def relocate_store(cfg: Config) -> int:
+    """Point a copied MLflow store at this checkout. Returns the number of cells updated.
+
+    MLflow records artifact locations as absolute URIs, so a store moved to another
+    folder or machine cannot find its models. This rewrites the recorded project root
+    (read from the experiment's artifact location) to the current PROJECT_ROOT in every
+    text column of the SQLite store. Run once after extracting the release archive.
+    """
+    import sqlite3
+
+    db = PROJECT_ROOT / cfg["mlflow"]["tracking_uri"].removeprefix("sqlite:///")
+    art_name = cfg["mlflow"]["artifact_location"]
+    con = sqlite3.connect(db)
+    try:
+        row = con.execute("SELECT artifact_location FROM experiments WHERE name = ?", (cfg["mlflow"]["experiment"],)).fetchone()
+        if row is None:
+            return 0
+        old_art = row[0].removeprefix("file://")
+        old_root = old_art[: -len(art_name)].rstrip("/")
+        new_root = str(PROJECT_ROOT)
+        if old_root == new_root:
+            return 0
+        changed = 0
+        tables = [r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type = 'table'")]
+        for t in tables:
+            for _, col, ctype, *_ in con.execute(f'PRAGMA table_info("{t}")'):
+                if "CHAR" in ctype.upper() or "TEXT" in ctype.upper():
+                    cur = con.execute(f'UPDATE "{t}" SET "{col}" = REPLACE("{col}", ?, ?) WHERE "{col}" LIKE ?',
+                                      (old_root, new_root, f"%{old_root}%"))
+                    changed += cur.rowcount
+        con.commit()
+        return changed
+    finally:
+        con.close()
+
+
 def log_and_register(model, X: pd.DataFrame, task: str, registered_name: str | None, alias: str | None = None):
     """Log a fitted sklearn pipeline with signature; optionally register and alias it."""
     example = X.head(5)

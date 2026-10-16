@@ -2,7 +2,7 @@ PY ?= python3
 export PYTHONPATH := src
 export MLFLOW_DISABLE_AGENT_HINT := 1
 
-.PHONY: install test smoke data translation models stats figures all ui clean
+.PHONY: install test smoke data translation models stats figures all ui relocate clean
 
 install:            ## install pinned dependencies
 	$(PY) -m pip install -r requirements.txt
@@ -30,6 +30,9 @@ figures:            ## regenerate reports/figures from saved metrics
 
 all:                ## full reproducible run (about 25 min on 2 cores)
 	$(PY) -m cgmt.pipeline --stage all
+
+relocate:           ## once after extracting the archive elsewhere: repoint MLflow artifact paths
+	$(PY) -m cgmt.pipeline --stage relocate
 
 ui:                 ## browse runs and the model registry
 	mlflow ui --backend-store-uri sqlite:///mlflow.db

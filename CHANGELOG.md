@@ -14,7 +14,19 @@ the report can be traced to the exact code and data that produced it.
 Versions 0.1.0–0.3.0 were development steps made before the repository was initialised
 (first commit = 0.4.0); they are recorded so the reasoning behind each decision is not lost.
 
+## [1.0.1] - 2026-10-15
+
+### Added
+- `make relocate` (`--stage relocate`): rewrites the absolute artifact paths MLflow stores in
+  `mlflow.db` so the registry works after the archive is extracted anywhere. Idempotent.
+  No number in `reports/metrics/` changes.
+
 ## [1.0.0] - 2026-10-15
+
+Note: the release run's MLflow runs carry `git_commit = e8e0b91` (tag v0.9.0), the code that
+trained every model. Changes in 1.0.0 after that run (below) touch only the GLM, the Friedman
+rank labels and the figures, which were regenerated with `--stage translation`, `--stage stats`
+and `--stage figures`.
 
 ### Added
 - Technical report, README, model card, CI workflow (pytest + smoke pipeline).

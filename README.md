@@ -1,4 +1,4 @@
-# CGMT — Combine-to-Game Movement Translation
+# CGMT — Combine-to-Game Movement Translation (v1.0.1)
 
 Do NFL Combine drills predict how a prospect moves in games, and does in-game
 movement tell us who becomes a starter? This project answers that for one
@@ -60,6 +60,7 @@ mlflow.db, mlartifacts/    experiment store and model registry (in the release a
 
 ```bash
 python -m pip install -r requirements.txt     # Python 3.13, pinned versions
+make relocate                                 # once, after extracting the archive (repoints MLflow paths)
 make test                                     # 18 unit tests, ~5 s
 make smoke                                    # whole pipeline on tiny grids, ~3 min
 make all                                      # release run, ~30 min on 2 cores
