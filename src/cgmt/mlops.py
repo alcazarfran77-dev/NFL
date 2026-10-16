@@ -89,6 +89,9 @@ def log_and_register(model, X: pd.DataFrame, task: str, registered_name: str | N
     info = mlflow.sklearn.log_model(
         model, name="model", signature=sig, input_example=example,
         code_paths=[str(Path(__file__).resolve().parent)],
+        # The pipeline contains a project transformer (PositionMedianImputer) that skops
+        # cannot serialise; cloudpickle is safe here because only our own code is loaded.
+        serialization_format="cloudpickle",
         registered_model_name=registered_name,
     )
     if registered_name and alias:

@@ -29,7 +29,7 @@ mlflow:
   artifact_location: mlartifacts
   experiment: cgmt-combine-translation
   register_models: true
-  regressor_name: cgmt-snap-burst-regressor
+  regressor_name: cgmt-snap-burst-regressor        # suffix -dl for the defensive-line model
   classifier_name: cgmt-starter-classifier
 
 business_rules:
@@ -80,15 +80,16 @@ cv:
   bootstrap_resamples: 2000
 
 regression:
-  target: burst_2s_eb              # shrunk 2-second post-snap burst capacity (yd)
+  populations: [all_positions, defensive_line]   # defensive_line = where snap burst is a reliable trait
+  target: sbi                      # Snap Burst Index: within-position z of shrunk 2-s burst (50 +/- 10)
   grids:
     ridge:
-      model__alpha: [0.1, 1.0, 10.0, 100.0]
+      model__alpha: [1.0, 10.0, 100.0, 300.0, 1000.0]
     random_forest:
-      model__n_estimators: [300]
+      model__n_estimators: [200]
       model__max_depth: [3, 6, null]
       model__min_samples_leaf: [3, 10]
-      model__max_features: [0.33, 1.0]
+      model__max_features: [0.33, 0.66]
     xgboost:
       model__n_estimators: [200, 400]
       model__max_depth: [2, 3]
@@ -107,10 +108,10 @@ classification:
       model__C: [0.01, 0.1, 1.0, 10.0]
       model__l1_ratio: [0.0, 1.0]     # 0 = ridge (L2), 1 = lasso (L1)
     random_forest:
-      model__n_estimators: [300]
+      model__n_estimators: [200]
       model__max_depth: [3, 6, null]
       model__min_samples_leaf: [3, 10]
-      model__max_features: [0.33, 1.0]
+      model__max_features: [0.33, 0.66]
     xgboost:
       model__n_estimators: [200, 400]
       model__max_depth: [2, 3]

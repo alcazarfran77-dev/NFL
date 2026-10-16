@@ -1,0 +1,164 @@
+# Fast configuration for CI and smoke tests: same code path, tiny CV and grids.
+project: cgmt
+seed: 42
+paths:
+  raw: data/raw
+  interim: data/interim
+  processed: data/processed
+  manifest: data/manifest.json
+  reports: reports
+  figures: reports/smoke/figures
+  metrics: reports/smoke/metrics
+  models: models
+raw_files:
+  combine: combine_results.csv
+  players: players.csv
+  careers: player_career_successes.csv
+  games: games.csv
+  tracking:
+  - game_tracking_2024_2.csv
+  - game_tracking_2025_2.csv
+mlflow:
+  tracking_uri: sqlite:///mlflow_smoke.db
+  artifact_location: mlartifacts_smoke
+  experiment: cgmt-smoke
+  register_models: true
+  regressor_name: cgmt-snap-burst-regressor
+  classifier_name: cgmt-starter-classifier
+business_rules:
+  last_completed_season: 2025
+  games_per_season: 17
+  starter_threshold: 0.5
+  undrafted_pick: 260
+  draft_reference_month_day: 04-27
+  power_conferences:
+  - Southeastern Conference
+  - Big Ten Conference
+  - Atlantic Coast Conference
+  - Big Twelve Conference
+  - Pacific Twelve Conference
+  drill_valid_ranges:
+    combine_height:
+    - 64
+    - 84
+    combine_weight:
+    - 140
+    - 400
+    hand_size:
+    - 7
+    - 12
+    arm_length:
+    - 27
+    - 38
+    wing_span:
+    - 66
+    - 90
+    ten_yd_split:
+    - 1.3
+    - 2.2
+    forty:
+    - 4.1
+    - 6.0
+    vertical:
+    - 15
+    - 50
+    broad_jump:
+    - 70
+    - 150
+    three_cone:
+    - 6.2
+    - 9.0
+    short_shuttle:
+    - 3.7
+    - 5.6
+    bench_reps:
+    - 0
+    - 50
+tracking_rules:
+  frame_rate_hz: 10
+  snap_events:
+  - ball_snap
+  - snap_direct
+  min_post_snap_frames: 20
+  burst_horizon_s: 2.0
+  get_off_horizon_s: 1.0
+  cut_window_s: 0.5
+  cut_min_speed: 2.0
+  speed_cap: 12.5
+  accel_cap: 15.0
+  min_plays_per_player: 3
+  capacity_quantile: 0.8
+  sbi_center: 50
+  sbi_scale: 10
+cv:
+  outer_splits: 2
+  outer_repeats: 1
+  inner_splits: 2
+  bootstrap_resamples: 50
+regression:
+  populations:
+  - all_positions
+  - defensive_line
+  target: sbi
+  grids:
+    ridge:
+      model__alpha:
+      - 1.0
+    random_forest:
+      model__n_estimators:
+      - 200
+      model__max_depth:
+      - 3
+      model__min_samples_leaf:
+      - 3
+      model__max_features:
+      - 0.33
+    xgboost:
+      model__n_estimators:
+      - 200
+      model__max_depth:
+      - 2
+      model__learning_rate:
+      - 0.03
+      model__subsample:
+      - 0.8
+      model__colsample_bytree:
+      - 0.8
+      model__min_child_weight:
+      - 3
+      model__reg_lambda:
+      - 1.0
+classification:
+  target: is_starter
+  scoring: roc_auc
+  decision_threshold: 0.5
+  grids:
+    logistic_regression:
+      model__C:
+      - 0.01
+      model__l1_ratio:
+      - 0.0
+    random_forest:
+      model__n_estimators:
+      - 200
+      model__max_depth:
+      - 3
+      model__min_samples_leaf:
+      - 3
+      model__max_features:
+      - 0.33
+    xgboost:
+      model__n_estimators:
+      - 200
+      model__max_depth:
+      - 2
+      model__learning_rate:
+      - 0.03
+      model__subsample:
+      - 0.8
+      model__colsample_bytree:
+      - 0.8
+      model__min_child_weight:
+      - 3
+      model__reg_lambda:
+      - 1.0

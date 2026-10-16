@@ -30,7 +30,7 @@ from .config import Config, load_config, set_global_seed
 from .data import load_raw, write_manifest
 from .features import FEATURE_SETS, ATHLETIC, classification_table, regression_table, xy
 from .models import nested_cv, refit_final
-from .movement import METRICS, clean_tracking, estimator_bias, play_metrics, player_profiles
+from .movement import METRICS, clean_tracking, estimator_bias, metric_reliability, play_metrics, player_profiles
 from .stats import bootstrap_ci, delong_test, friedman, pairwise_model_tests, within_group_spearman
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -119,6 +119,27 @@ def stage_translation(cfg: Config, d: dict) -> dict:
     matrix["x_oriented"] = matrix["x"].isin(TIME_DRILLS)
     _save(matrix, cfg, "translation_matrix.csv", key="metrics")
 
+    # Reliability of the SBI: mean empirical-Bayes weight. It caps how much variance any
+    # pre-draft model can explain (observed R^2 <= reliability x true R^2).
+    rel = profiles.groupby("combine_position", observed=True)["sbi_reliability"].agg(["mean", "median", "min", "max", "count"])
+    rel.loc["ALL"] = [profiles.sbi_reliability.mean(), profiles.sbi_reliability.median(),
+                      profiles.sbi_reliability.min(), profiles.sbi_reliability.max(), len(profiles)]
+    _save(rel.reset_index(names="combine_position"), cfg, "sbi_reliability_by_position.csv", key="metrics")
+
+    # Which game metrics are stable player traits, by position? (ICC + one-way ANOVA)
+    reliab = metric_reliability(d["plays"], profiles)
+    _save(reliab, cfg, "metric_reliability.csv", key="metrics")
+
+    # Defensive line deep dive: raw vs role-adjusted (edge DE/OLB vs interior DT/NT) translation.
+    dl = oriented[oriented.combine_position == "DL"].copy()
+    dl["dl_role"] = np.where(dl["nfl_position"].isin(["DT", "NT"]), "interior", "edge")
+    dl_y = ["burst_2s_eb", "get_off_1s_eb", "peak_accel_2s_eb"]
+    dl_tab = pd.concat([
+        within_group_spearman(dl, TRANSLATION_X, dl_y, "combine_position", nb, cfg.seed).assign(adjustment="none"),
+        within_group_spearman(dl, TRANSLATION_X, dl_y, "dl_role", nb, cfg.seed).assign(adjustment="edge vs interior role"),
+    ], ignore_index=True)
+    _save(dl_tab, cfg, "dl_translation_role_adjusted.csv", key="metrics")
+
     # Game movement vs starting, within position group
     starter_assoc = within_group_spearman(df, ["sbi"] + [f"{m}_z" for m in METRICS if m != "burst_2s"],
                                           ["start_rate"], "combine_position", nb, cfg.seed)
@@ -179,57 +200,80 @@ def stage_translation(cfg: Config, d: dict) -> dict:
 
 # ----------------------------------------------------------------------------- 5 regression
 def stage_regression(cfg: Config, d: dict) -> dict:
+    """Combine -> Snap Burst Index, for all positions and for the defensive line only.
+
+    The defensive line is the one group where 2-second snap burst is a reliable
+    player trait (see sbi_reliability / metric_reliability), so it is where a
+    Combine-to-game translation model has a measurable target.
+    """
     target = cfg["regression"]["target"]
-    df = regression_table(d["prospects"], d["profiles"], target).reset_index(drop=True)
-    X, y = xy(df, ATHLETIC, target)
-    strata = df["combine_position"].astype(str)
     grids = cfg["regression"]["grids"]
     models = ["position_mean", "ridge", "random_forest", "xgboost"]
-    results = {}
-    for name in models:
-        t0 = time.time()
-        res = nested_cv(name, "athletic", "regression", X, y, strata, grids.get(name, {}), cfg, cfg.seed)
-        with mlops.run(cfg, f"reg-{name}", {"stage": "cv", "task": "regression", "target": target}):
-            mlops.log_cv_result(res, {"grid": json.dumps(grids.get(name, {}))})
-        results[name] = res
-        log.info("regression %s: %s (%.0fs)", name, res.fold_scores[["mae", "rmse", "r2"]].mean().round(3).to_dict(), time.time() - t0)
+    full = regression_table(d["prospects"], d["profiles"], target)
+    full["dl_role"] = np.where(full["nfl_position"].isin(["DT", "NT"]), "interior", "edge")
+    out = {"summary": [], "tests": [], "friedman": {}, "gap": [], "importance": [], "champions": {}}
+    for pop in cfg["regression"]["populations"]:
+        df = (full if pop == "all_positions" else full[full.combine_position == "DL"]).reset_index(drop=True)
+        X, y = xy(df, ATHLETIC, target)
+        # CV strata are used only to balance the splits (never as a feature).
+        strata = df["combine_position"].astype(str) if pop == "all_positions" else df["dl_role"]
+        results = {}
+        for name in models:
+            t0 = time.time()
+            res = nested_cv(name, "athletic", "regression", X, y, strata, grids.get(name, {}), cfg, cfg.seed)
+            with mlops.run(cfg, f"reg-{pop}-{name}", {"stage": "cv", "task": "regression", "target": target, "population": pop}):
+                mlops.log_cv_result(res, {"grid": json.dumps(grids.get(name, {})), "population": pop, "n_rows": len(df)})
+            results[name] = res
+            log.info("regression %s/%s: %s (%.0fs)", pop, name, res.fold_scores[["mae", "rmse", "r2"]].mean().round(3).to_dict(), time.time() - t0)
 
-    summary, scores = _summarise(results, ["mae", "rmse", "r2"], cfg, task="regression")
-    any_res = next(iter(results.values()))
-    tests = pd.concat([pairwise_model_tests(scores[m], m, any_res.n_train, any_res.n_test, higher_is_better=(m == "r2"))
-                       for m in ["rmse", "r2"]], ignore_index=True)
-    fried = {m: friedman(scores[m]) for m in ["rmse", "r2"]}
+        summary, scores = _summarise(results, ["mae", "rmse", "r2"], cfg, task="regression")
+        summary.insert(0, "population", pop)
+        summary.insert(1, "n", len(df))
+        any_res = next(iter(results.values()))
+        tests = pd.concat([pairwise_model_tests(scores[m], m, any_res.n_train, any_res.n_test, higher_is_better=(m == "r2"))
+                           for m in ["rmse", "r2"]], ignore_index=True)
+        tests.insert(0, "population", pop)
+        out["friedman"][pop] = {m: friedman(scores[m]) for m in ["rmse", "r2"]}
+        for m, s in scores.items():
+            _save(s.reset_index(names="fold"), cfg, f"regression_fold_{pop}_{m}.csv", key="metrics")
+
+        # Champion = lowest mean RMSE among learned models; refit on all rows and register.
+        champ = summary[summary.model != "position_mean"].sort_values("rmse_mean").iloc[0]["model"]
+        est, best, score = refit_final(champ, "regression", X, y, grids.get(champ, {}), cfg, cfg.seed)
+        reg_name = cfg["mlflow"]["regressor_name"] + ("" if pop == "all_positions" else "-dl")
+        with mlops.run(cfg, f"reg-final-{pop}-{champ}", {"stage": "final", "task": "regression", "population": pop}):
+            import mlflow
+            mlflow.log_params({"model": champ, "population": pop, **{k.replace("model__", ""): v for k, v in best.items()}})
+            mlflow.log_metric("refit_inner_cv_rmse", -score)
+            mlops.log_and_register(est, X, "regression", reg_name if cfg["mlflow"]["register_models"] else None, "champion")
+        out["champions"][pop] = {"model": champ, "params": best, "inner_rmse": -score}
+
+        # Translation gap: game SBI minus Combine-predicted SBI (out-of-fold, mean over repeats).
+        # Positive = "plays faster off the snap than he tested"; negative = the reverse.
+        oof = results[champ].oof.groupby("row")["pred"].mean()
+        cols = list(dict.fromkeys(["nfl_id", "display_name", "combine_position", "nfl_position", "dl_role", "draft_year",
+                                   "draft_round", "burst_2s_eb", target, "sbi_reliability", "n_plays", "start_rate", "is_starter"]))
+        gap = df[cols].copy()
+        gap["predicted_sbi"] = oof.reindex(gap.index).to_numpy()
+        gap["translation_gap"] = gap[target] - gap["predicted_sbi"]
+        out["gap"].append(gap.assign(population=pop))
+
+        # Permutation importance of the champion (on the rows it was refit on; descriptive)
+        pi = permutation_importance(est, X, y, scoring="neg_root_mean_squared_error", n_repeats=20, random_state=cfg.seed)
+        out["importance"].append(pd.DataFrame({"population": pop, "feature": X.columns, "importance": pi.importances_mean,
+                                               "std": pi.importances_std}).sort_values("importance", ascending=False))
+        out["summary"].append(summary)
+        out["tests"].append(tests)
+
+    summary = pd.concat(out["summary"], ignore_index=True)
     _save(summary, cfg, "regression_summary.csv", key="metrics")
-    _save(tests, cfg, "regression_pairwise_tests.csv", key="metrics")
-    _dump(fried, cfg, "regression_friedman.json")
-    for m, s in scores.items():
-        _save(s.reset_index(), cfg, f"regression_fold_{m}.csv", key="metrics")
-
-    # Champion = lowest mean RMSE among learned models; refit on all data and register.
-    champ = summary[summary.model != "position_mean"].sort_values("rmse_mean").iloc[0]["model"]
-    est, best, score = refit_final(champ, "regression", X, y, grids.get(champ, {}), cfg, cfg.seed)
-    with mlops.run(cfg, f"reg-final-{champ}", {"stage": "final", "task": "regression", "champion": "true"}):
-        import mlflow
-        mlflow.log_params({"model": champ, **{k.replace("model__", ""): v for k, v in best.items()}})
-        mlflow.log_metric("refit_inner_cv_rmse", -score)
-        mlops.log_and_register(est, X, "regression", cfg["mlflow"]["regressor_name"] if cfg["mlflow"]["register_models"] else None, "champion")
-
-    # Translation gap: actual minus Combine-predicted burst (OOF, mean over repeats)
-    oof = results[champ].oof.groupby("row")["pred"].mean()
-    gap = df[["nfl_id", "display_name", "combine_position", "nfl_position", "draft_year", "draft_round",
-              target, "sbi", "n_plays", "start_rate"]].copy()
-    gap["predicted_burst"] = oof.reindex(gap.index).to_numpy()
-    gap["translation_gap_yd"] = gap[target] - gap["predicted_burst"]
-    gg = gap.groupby("combine_position", observed=True)["translation_gap_yd"]
-    gap["translation_gap_z"] = (gap["translation_gap_yd"] - gg.transform("mean")) / gg.transform("std")
-    _save(gap.sort_values("translation_gap_z", ascending=False), cfg, "translation_gap.csv", key="metrics")
-
-    # Permutation importance of the champion (on the full data it was refit on; descriptive)
-    pi = permutation_importance(est, X, y, scoring="neg_root_mean_squared_error", n_repeats=20, random_state=cfg.seed)
-    imp = pd.DataFrame({"feature": X.columns, "importance": pi.importances_mean, "std": pi.importances_std}).sort_values("importance", ascending=False)
-    _save(imp, cfg, "regression_permutation_importance.csv", key="metrics")
-    return {"results": results, "summary": summary, "tests": tests, "friedman": fried, "champion": champ,
-            "best_params": best, "gap": gap, "importance": imp, "table": df}
+    _save(pd.concat(out["tests"], ignore_index=True), cfg, "regression_pairwise_tests.csv", key="metrics")
+    _dump(out["friedman"], cfg, "regression_friedman.json")
+    _dump(out["champions"], cfg, "regression_final_models.json")
+    gap = pd.concat(out["gap"], ignore_index=True).sort_values(["population", "translation_gap"], ascending=[True, False])
+    _save(gap, cfg, "translation_gap.csv", key="metrics")
+    _save(pd.concat(out["importance"], ignore_index=True), cfg, "regression_permutation_importance.csv", key="metrics")
+    return {"summary": summary, "champions": out["champions"], "gap": gap}
 
 
 # ----------------------------------------------------------------------------- 6 classification

@@ -127,16 +127,20 @@ def _shrink(group: pd.DataFrame, col: str) -> pd.Series:
     of player means net of sampling noise (method of moments, floored at 5% of the
     observed variance so no group is shrunk to a single point).
     """
-    n = group["n_plays"]
     mean = group[f"{col}_mean"]
+    w = shrink_weight(group, col)
+    grand = np.average(mean, weights=group["n_plays"])
+    return grand + w * (mean - grand)
+
+
+def shrink_weight(group: pd.DataFrame, col: str) -> pd.Series:
+    """Empirical-Bayes weight n / (n + k) on a player's own mean (= its reliability)."""
+    n = group["n_plays"]
     s2w = group[f"{col}_var"].fillna(group[f"{col}_var"].median())
     sigma2 = np.average(s2w, weights=n - 1)
-    total = mean.var(ddof=1)
+    total = group[f"{col}_mean"].var(ddof=1)
     tau2 = max(total - np.mean(sigma2 / n), 0.05 * total)
-    k = sigma2 / tau2
-    w = n / (n + k)
-    grand = np.average(mean, weights=n)
-    return grand + w * (mean - grand)
+    return n / (n + sigma2 / tau2)
 
 
 def player_profiles(plays: pd.DataFrame, prospects: pd.DataFrame, cfg: Config) -> pd.DataFrame:
@@ -156,6 +160,10 @@ def player_profiles(plays: pd.DataFrame, prospects: pd.DataFrame, cfg: Config) -
         prof[f"{col}_eb"] = prof.groupby("combine_position", observed=True, group_keys=False).apply(
             lambda grp, c=col: _shrink(grp, c)
         )
+    # Reliability of each player's SBI (share of his own mean kept after shrinkage).
+    prof["sbi_reliability"] = prof.groupby("combine_position", observed=True, group_keys=False).apply(
+        lambda grp: shrink_weight(grp, "burst_2s")
+    )
     # Snap Burst Index: position-normalised, on a 50 +/- 10 scale like other scouting grades.
     grp = prof.groupby("combine_position", observed=True)["burst_2s_eb"]
     z = (prof["burst_2s_eb"] - grp.transform("mean")) / grp.transform("std")
@@ -165,6 +173,35 @@ def player_profiles(plays: pd.DataFrame, prospects: pd.DataFrame, cfg: Config) -
         gcol = prof.groupby("combine_position", observed=True)[f"{col}_eb"]
         prof[f"{col}_z"] = (prof[f"{col}_eb"] - gcol.transform("mean")) / gcol.transform("std")
     return prof.drop(columns=[c for c in prof.columns if c.endswith("_var")]).reset_index(drop=True)
+
+
+def metric_reliability(plays: pd.DataFrame, profiles: pd.DataFrame, group: str = "combine_position") -> pd.DataFrame:
+    """Is a movement metric a stable player trait? One row per (position group, metric).
+
+    icc            share of between-player variance in player means net of sampling noise
+                   (method of moments; <= 0 means no detectable player differences)
+    mean_weight    average empirical-Bayes weight n/(n+k) = reliability of a player's estimate
+    anova_p        one-way ANOVA p-value for "all players in the group move alike"
+    """
+    from scipy import stats
+
+    keep = plays[plays.nfl_id.isin(profiles.nfl_id)]
+    rows = []
+    for pos, g in keep.groupby(group, observed=True):
+        for m in METRICS:
+            gg = g.groupby("nfl_id")[m]
+            n, mu, var = gg.size(), gg.mean(), gg.var(ddof=1)
+            sigma2 = np.average(var.fillna(var.median()), weights=n - 1)
+            total = mu.var(ddof=1)
+            tau2 = total - np.mean(sigma2 / n)
+            groups = [v.dropna().to_numpy() for _, v in gg]
+            groups = [v for v in groups if len(v) > 0]
+            f, p = stats.f_oneway(*groups) if len(groups) > 1 else (np.nan, np.nan)
+            w = n / (n + sigma2 / tau2) if tau2 > 0 else pd.Series(0.0, index=n.index)
+            rows.append({group: pos, "metric": m, "players": len(n), "plays": int(n.sum()),
+                         "icc": tau2 / total if total > 0 else np.nan, "mean_weight": float(w.mean()),
+                         "anova_f": float(f), "anova_p": float(p)})
+    return pd.DataFrame(rows)
 
 
 def estimator_bias(plays: pd.DataFrame, metric: str, ns: list[int], n_sims: int, seed: int, min_plays: int = 20) -> pd.DataFrame:
@@ -195,7 +232,7 @@ def speed_curves(frames: pd.DataFrame, plays: pd.DataFrame, nfl_ids: list[int], 
     rows = []
     for key, d in sub.groupby(PLAY_KEY, sort=False):
         ev = d["event"].to_numpy(dtype=object)
-        idx = next((i for i, e in enumerate(ev) if e in ("ball_snap", "snap_direct")), None)
+        idx = next((i for i, e in enumerate(ev) if e in {"ball_snap", "snap_direct"}), None)
         if idx is None:
             continue
         post = d.iloc[idx: idx + int(horizon_s * hz) + 1]

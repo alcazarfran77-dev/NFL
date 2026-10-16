@@ -28,7 +28,7 @@ FEATURE_SETS["combine_draft_mov"] = FEATURE_SETS["combine_draft"] + MOVEMENT_FEA
 
 
 def regression_table(prospects: pd.DataFrame, profiles: pd.DataFrame, target: str) -> pd.DataFrame:
-    keep = ["nfl_id", target, "sbi", "n_plays"]
+    keep = list(dict.fromkeys(["nfl_id", target, "sbi", "burst_2s_eb", "sbi_reliability", "n_plays"]))
     return profiles[keep].merge(prospects, on="nfl_id", how="inner", validate="1:1")
 
 
