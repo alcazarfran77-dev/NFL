@@ -1,0 +1,27 @@
+drill_group,metric,method,n_players,reliability,feature,passes_gate,note
+forty,split_0_5_s,test-retest (attempts 1 vs 2),375,0.1561263099813351,,False,below the reliability gate
+forty,split_5_10_s,test-retest (attempts 1 vs 2),375,0.8706932845656936,ct_forty_split_5_10_s,True,
+forty,split_10_20_s,test-retest (attempts 1 vs 2),375,0.9795621363840007,,True,"same construct as top speed (r = -0.95), slightly less reliable"
+forty,split_10yd_s,test-retest (attempts 1 vs 2),375,0.22580695058504704,,False,below the reliability gate
+forty,top_speed,test-retest (attempts 1 vs 2),375,0.9859473690680479,ct_forty_top_speed,True,
+forty,peak_accel,test-retest (attempts 1 vs 2),375,0.5051619362968542,,True,"same construct as the 5-10 yd split, less reliable"
+forty,burst_1s,test-retest (attempts 1 vs 2),375,0.33156157905307737,,False,below the reliability gate
+forty,burst_2s,test-retest (attempts 1 vs 2),375,0.4032762108198108,,False,below the reliability gate
+forty,t90_top_s,test-retest (attempts 1 vs 2),375,0.38557262595773745,,False,below the reliability gate
+3cone,duration_s,test-retest (attempts 1 vs 2),38,0.8163159121448282,,True,duplicates the official 3-cone time
+3cone,top_speed,test-retest (attempts 1 vs 2),38,0.5386561531466793,,True,"sprint speed, already measured in the 40"
+3cone,peak_accel,test-retest (attempts 1 vs 2),38,0.495557395121516,,False,below the reliability gate
+3cone,peak_decel,test-retest (attempts 1 vs 2),38,0.4324505287902996,,False,below the reliability gate
+3cone,plant_speed_ratio,test-retest (attempts 1 vs 2),38,0.44444763800084036,,False,below the reliability gate
+3cone,max_cut_deg,test-retest (attempts 1 vs 2),38,0.1360257588658732,,False,below the reliability gate
+shuttle,duration_s,test-retest (attempts 1 vs 2),40,0.19976683660304148,,False,below the reliability gate
+shuttle,top_speed,test-retest (attempts 1 vs 2),40,0.21288559077277333,,False,below the reliability gate
+shuttle,peak_accel,test-retest (attempts 1 vs 2),40,0.30628407619464665,,False,below the reliability gate
+shuttle,peak_decel,test-retest (attempts 1 vs 2),40,0.34918129688317207,,False,below the reliability gate
+shuttle,plant_speed_ratio,test-retest (attempts 1 vs 2),40,0.5422856530828226,ct_shuttle_plant_speed_ratio,True,
+shuttle,max_cut_deg,test-retest (attempts 1 vs 2),40,0.34380860219951975,,False,below the reliability gate
+skill,top_speed,"split-half, Spearman-Brown",510,0.7843180841841753,ct_skill_speed_z,True,
+skill,peak_accel,"split-half, Spearman-Brown",510,0.5486757328788193,ct_skill_accel_z,True,
+skill,peak_decel,"split-half, Spearman-Brown",510,0.32031273105019975,,False,below the reliability gate
+skill,max_cut_deg,"split-half, Spearman-Brown",510,0.287534966781636,,False,below the reliability gate
+skill,burst_1s,"split-half, Spearman-Brown",510,0.3087837053731765,,False,below the reliability gate

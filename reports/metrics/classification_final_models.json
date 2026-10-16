@@ -31,6 +31,22 @@
     "inner_auc": 0.8791575889615105,
     "registered_as": "cgmt-starter-classifier-movement@challenger"
   },
+  "challenger:cgmt-starter-classifier-combine-tracking": {
+    "population": "all_prospects",
+    "feature_set": "combine_draft_ct",
+    "model": "xgboost",
+    "params": {
+      "model__colsample_bytree": 0.8,
+      "model__learning_rate": 0.03,
+      "model__max_depth": 2,
+      "model__min_child_weight": 3,
+      "model__n_estimators": 200,
+      "model__reg_lambda": 1.0,
+      "model__subsample": 0.8
+    },
+    "inner_auc": 0.9119451255359114,
+    "registered_as": "cgmt-starter-classifier-combine-tracking@challenger"
+  },
   "challenger:cgmt-starter-classifier-onfield": {
     "population": "onfield_subset",
     "feature_set": "combine_draft_perf",

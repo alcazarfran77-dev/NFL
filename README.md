@@ -1,4 +1,4 @@
-# CGMT — Combine-to-Game Movement Translation (v2.1.0)
+# CGMT — Combine-to-Game Movement Translation (v2.2.0)
 
 Do NFL Combine drills predict how a prospect moves and performs in regular-season
 games, and does that tell us who becomes a starter? This project answers it for one
@@ -24,17 +24,29 @@ The provider's data structure spec (`docs/Data_structure_CSV_files.docx`) is enc
 severity and the handling the pipeline applies. Errors (missing required file or column,
 duplicate key, broken foreign key) stop the run. Deviations are warnings, handled by business rules.
 
-Against the files delivered: **0 errors, 23 warnings**, and no number changed (v2.1.0 in the changelog).
-What differs from the spec:
+Against the files delivered: **0 errors, 26 warnings** (370 checks). What differs from the spec:
 
 | Spec | Delivered | Effect |
 |---|---|---|
-| `combine_tracking.csv`, 6,310 drill attempts | not delivered | `cgmt.combine_tracking` (tested) switches on when the file is added |
+| `combine_tracking.csv`, 6,310 drill attempts | `combine_tracking_6.csv`: 6,310 attempts, 510 prospects (v2.2) | 40 lane outside the 0-53.3 yd frame; ball rows exceed player ranges and are dropped (R16) |
 | `game_tracking_2023/2024/2025.csv`, all 510 prospects | `game_tracking_2024_2.csv`, `_2025_2.csv`: Week 18 + playoffs, 279 prospects | SBI uses 221 players with 3+ plays; full files are read as is (split parts are ignored when the full file is present) |
 | `player_play.csv`, 316,338 rows | `player_play_3.csv`, 314,197 rows (-0.68%) | results use the rows delivered |
 | games: REG/POST, weeks 1-18 | also PRE (147 games, weeks 0-3), playoffs weeks 19-23 | R10 on-field = REG; R8b tracking = REG + POST |
 | `down` 1-4 | 961 rows with down 0 (two-point tries) | R15 removes them (none was a family play) |
 | quick/unblocked pressure, recovered fumble, TFL as 1.0/null | TRUE/FALSE text | the boolean parser reads both |
+
+## Combine drill tracking (v2.2)
+
+1. **The start of a tracked drill is not repeatable; distance splits are.** Across a player's two 40s the
+   0-5 yd split repeats at r = 0.16, the 5-10 yd split at 0.87 and top speed at 0.99. Features are gated at
+   r >= 0.5, one per construct: 40 acceleration (5-10 yd), 40 top speed, speed kept through the shuttle turns,
+   and position-drill top speed and acceleration (z-scored within each drill).
+2. **Position-drill top speed is new information that predicts DL get-off.** It is nearly independent of the
+   40 (rho -0.18), and it correlates +0.38 with season-long get-off over expected (q = 0.006).
+3. **It lifts the DL get-off model, and nothing else.** R² rises from 0.10 to 0.17 (better in 12 of 15 folds,
+   Wilcoxon p = 0.008, corrected t p = 0.19); pooled out-of-fold R² from 0.13 to 0.23. There is no gain for snap
+   burst, pressure, OL protection, separation or the starter model (AUC 0.915 -> 0.913). Champions are unchanged;
+   the drill-tracking models are registered as challengers.
 
 ## Headline findings (v2.0)
 
@@ -78,7 +90,7 @@ configs/config.yaml        single source of truth: paths, business rules, CV, gr
 configs/smoke.yaml         same pipeline on tiny CV/grids (CI)
 configs/data_contract.yaml the provider's data structure spec as a checked contract (v2.1)
 docs/                      Data_structure_CSV_files.docx (the spec)
-data/raw/                  the seven input CSVs (not in git; hashed in data/manifest.json)
+data/raw/                  the eight input CSVs (not in git; hashed in data/manifest.json)
 data/processed/            prospects, tracking play metrics, movement profiles, on-field plays + profiles (parquet)
 src/cgmt/
   contract.py              data-contract validation and report (v2.1)
@@ -86,16 +98,16 @@ src/cgmt/
   cleaning.py              business rules R1-R7, starter target
   movement.py              tracking cleaning (R8-R9), per-play metrics, SBI, reliability
   performance.py           player_play rules R10-R15, on-field metrics over expected, stability (v2.0)
-  combine_tracking.py      Combine drill tracking (spec File 3, R16): drill features; on when the file exists (v2.1)
+  combine_tracking.py      Combine drill tracking (spec File 3, R16): attempt metrics, reliability gate, features (v2.2)
   features.py              nested feature sets
   models.py                PositionMedianImputer, OnFieldProjector, pipelines, nested CV, final refit
   stats.py                 corrected t-test, Wilcoxon-Holm, Friedman, DeLong, bootstrap, mediation
   mlops.py                 MLflow tracking, tags, model registry
-  viz.py                   18 report figures
+  viz.py                   21 report figures
   pipeline.py              CLI orchestrator
-tests/                     32 pytest tests
+tests/                     33 pytest tests
 reports/metrics/           every table behind the report (CSV/JSON)
-reports/figures/           fig01 ... fig18
+reports/figures/           fig01 ... fig21
 mlflow.db, mlartifacts/    experiment store and model registry (in the release archive)
 ```
 
@@ -105,9 +117,9 @@ mlflow.db, mlartifacts/    experiment store and model registry (in the release a
 python -m pip install -r requirements.txt     # Python 3.13, pinned versions
 make relocate                                 # once, after extracting the archive (repoints MLflow paths)
 make validate                                 # data contract only, ~10 s
-make test                                     # 32 unit tests, ~5 s
+make test                                     # 33 unit tests, ~5 s
 make smoke                                    # whole pipeline on tiny grids, ~5 min (own output folders)
-make all                                      # release run, ~45 min on 2 cores
+make all                                      # release run, ~60 min on 2 cores
 make ui                                       # MLflow UI: runs + registry
 ```
 
@@ -139,8 +151,8 @@ clf = mlflow.sklearn.load_model("models:/cgmt-starter-classifier@champion")
 
 ## Data notes
 
-- The Combine file holds drill **results**. The spec also lists drill tracking (`combine_tracking.csv`),
-  which was not delivered, so "movement during drills" is measured by times and distances until it is.
+- Combine drills are measured two ways: official results (times, distances) and, since v2.2, 10 Hz drill
+  tracking (`combine_tracking_6.csv`). Only tracking metrics that repeat within a player are used.
 - Tracking covers Week 18 and the playoffs of the 2024 and 2025 seasons, with 1–4
   tracked players per play and no ball or opponents, so the SBI uses individual kinematics.
 - `player_play` (v2.0) covers every game of 2023-2025 for 497 prospects; the on-field metrics

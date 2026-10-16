@@ -696,52 +696,61 @@ def _ci_from_t(mean_diff, t, df, level=0.95):
     return se * stats.t.ppf(0.5 + level / 2, df)
 
 
-def fig_ct_value(cfg, m_dir, reg, clf_tests, delong, n_folds):
+def fig_ct_value(cfg, m_dir, clf_tests, n_folds):
     """Does drill tracking improve out-of-sample prediction? Same rows and folds, with vs without."""
-    comp = pd.read_csv(m_dir / "regression_ct_comparison.csv")
+    bvb = pd.read_csv(m_dir / "ct_best_vs_best.csv")
     names = {"defensive_line": "DL snap burst (SBI)", "dl_getoff": "DL get-off over expected",
              "dl_pressure": "DL pressure over expected", "ol_protection": "OL protection over expected",
              "wrte_separation": "WR/TE separation over expected"}
-    rows = []
-    for pop in [p for p in names if p in set(comp.population)]:
-        s = reg[(reg.population == pop) & (reg.model != "position_mean")].sort_values("rmse_mean")
-        champ = s.iloc[0].model
-        c = comp[(comp.population == pop) & (comp.model == champ) & (comp.metric == "r2")].iloc[0]
-        rows.append({"label": f"{names[pop]}\n({LABELS[champ]})", "d": c.mean_diff_a_minus_b,
-                     "half": _ci_from_t(c.mean_diff_a_minus_b, c.t_corrected, n_folds - 1), "p": c.p_corrected_t})
-    r1 = pd.DataFrame(rows)
+    r1 = pd.DataFrame([{"label": f"{names[r.task]}\n{LABELS[r.model_without]} -> {LABELS[r.model_with]}",
+                        "d": r.r2_diff, "lo": r.r2_diff_ci_low, "hi": r.r2_diff_ci_high, "p": r.r2_p_corrected_t,
+                        "base": r.r2_without, "new": r.r2_with, "wins": r.r2_folds_better, "p_w": r.r2_p_wilcoxon}
+                       for r in bvb[bvb.kind == "regression"].itertuples() if r.task in names])
     t = clf_tests[(clf_tests.comparison == "feature_set_vs_feature_set") & clf_tests.feature_set.str.startswith("combine_draft_ct vs combine_draft")]
     rows = []
     for m in ["logistic_regression", "random_forest", "xgboost"]:
         c = t[t.feature_set.str.contains(f"({m})", regex=False)].iloc[0]
-        dl = delong[(delong.feature_set_1 == "combine_draft_ct") & (delong.model == m)]
-        rows.append({"label": LABELS[m], "d": c.mean_diff_a_minus_b, "half": _ci_from_t(c.mean_diff_a_minus_b, c.t_corrected, n_folds - 1),
-                     "p": c.p_corrected_t, "p_delong": float(dl.p_value.iloc[0]) if len(dl) else np.nan})
+        half = _ci_from_t(c.mean_diff_a_minus_b, c.t_corrected, n_folds - 1)
+        rows.append({"label": LABELS[m], "d": c.mean_diff_a_minus_b, "lo": c.mean_diff_a_minus_b - half,
+                     "hi": c.mean_diff_a_minus_b + half, "p": c.p_corrected_t})
+    cb = bvb[bvb.kind == "classification"]
+    if len(cb):
+        c = cb.iloc[0]
+        rows.append({"label": f"Best vs best\n{LABELS[c.model_without]} -> {LABELS[c.model_with]}", "d": c.roc_auc_diff,
+                     "lo": c.roc_auc_diff_ci_low, "hi": c.roc_auc_diff_ci_high, "p": c.roc_auc_p_corrected_t})
     r2 = pd.DataFrame(rows)
-    fig, (a1, a2) = plt.subplots(1, 2, figsize=(11.5, 4.9), gridspec_kw={"width_ratios": [1.35, 1]})
-    fig.subplots_adjust(left=0.2, right=0.97, top=0.78, bottom=0.15, wspace=0.45)
-    for ax, r, xl, title in [(a1, r1, "Change in outer-fold R² (with - without drill tracking)", "A. Combine -> game metrics (best model per task)"),
-                             (a2, r2, "Change in outer-fold ROC-AUC", "B. Starter classifier, Combine + draft")]:
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(12, 5.2), gridspec_kw={"width_ratios": [1.35, 1]})
+    fig.subplots_adjust(left=0.2, right=0.97, top=0.78, bottom=0.14, wspace=0.5)
+    for ax, r, xl, title, fmt in [(a1, r1, "Change in outer-fold R² (with - without drill tracking)",
+                                   "A. Combine -> game metrics (best model in each arm)", "{:+.3f}"),
+                                  (a2, r2, "Change in outer-fold ROC-AUC", "B. Starter classifier, Combine + draft", "{:+.3f}")]:
         yy = np.arange(len(r))[::-1]
         for yi, row in zip(yy, r.itertuples()):
             sig = row.p < 0.05
             col = ACCENT if sig and row.d > 0 else (ORANGE if sig else INK2)
-            ax.errorbar(row.d, yi, xerr=row.half, fmt="o", color=col, ecolor=col, capsize=3, markersize=7, elinewidth=1.6)
-            ax.text(row.d, yi + 0.22, f"{row.d:+.3f}  (p = {row.p:.2f})", ha="center", fontsize=7.8, color=INK)
+            ax.errorbar(row.d, yi, xerr=[[row.d - row.lo], [row.hi - row.d]], fmt="o", color=col, ecolor=col, capsize=3,
+                        markersize=7, elinewidth=1.6)
+            extra = f"  R² {row.base:+.2f} -> {row.new:+.2f}" if hasattr(row, "base") else ""
+            ax.text(row.d, yi + 0.24, fmt.format(row.d) + f" (p = {row.p:.2f})" + extra, ha="center", fontsize=7.6, color=INK)
         ax.axvline(0, color=INK2, linewidth=0.9)
-        ax.set_yticks(yy, r.label, fontsize=8.5)
-        ax.set_ylim(-0.6, len(r) - 0.3)
+        ax.set_yticks(yy, r.label, fontsize=8)
+        ax.set_ylim(-0.6, len(r) - 0.25)
         ax.set_xlabel(xl, fontsize=8.5)
         ax.set_title(title, fontsize=9.5)
-        lim = float(np.nanmax(np.abs(r.d) + r.half.fillna(0))) * 1.15
+        lim = float(np.nanmax(np.abs(np.r_[r.lo.to_numpy(), r.hi.to_numpy()]))) * 1.1
         ax.set_xlim(-lim, lim)
         ax.grid(axis="y", visible=False)
-    sig_up = [l.split(chr(10))[0] for l, d, p in zip(r1.label, r1.d, r1.p) if p < 0.05 and d > 0]
-    best_auc = r2.d.max()
-    head = (f"Drill tracking improves {', '.join(sig_up)}" if sig_up else "Drill tracking does not significantly improve any Combine -> game prediction")
-    _title(fig, f"{head}; starter AUC change {r2.d.min():+.3f} to {best_auc:+.3f}",
-           f"Same players and folds with and without the 5 drill-tracking features; mean over {n_folds} outer folds, 95% CI from the corrected resampled t-test")
-    _save(fig, cfg, "fig20_ct_value.png", "nested CV, regression_ct_comparison.csv + classification_pairwise_tests.csv")
+    up = [names[r.task] for r in bvb[bvb.kind == "regression"].itertuples() if r.task in names and r.r2_p_corrected_t < 0.05 and r.r2_diff > 0]
+    best_up = r1.sort_values("d").iloc[-1]
+    if up:
+        head = f"Drill tracking improves {', '.join(up)}"
+    else:
+        head = (f"Drill tracking lifts {best_up.label.split(chr(10))[0].replace(' over expected', '')} R² "
+                f"{best_up.base:+.2f} -> {best_up.new:+.2f} ({int(best_up.wins)}/{n_folds} folds, p = {best_up.p:.2f})")
+    _title(fig, f"{head}; nothing else improves",
+           f"Same players and folds with and without the 5 drill-tracking features; mean over {n_folds} outer folds, "
+           "95% CI from the corrected resampled t-test; blue = significant gain")
+    _save(fig, cfg, "fig20_ct_value.png", "nested CV fold scores: ct_best_vs_best.csv, classification_pairwise_tests.csv")
 
 
 def fig_ct_translation(cfg, mat):
@@ -750,8 +759,8 @@ def fig_ct_translation(cfg, mat):
     m = mat.set_index(["x", "y"])
     rho = np.array([[m.loc[(x, y), "rho"] if (x, y) in m.index else np.nan for y in ys] for x in CT_FEATURES])
     q = np.array([[m.loc[(x, y), "q_value"] if (x, y) in m.index else np.nan for y in ys] for x in CT_FEATURES])
-    fig, ax = plt.subplots(figsize=(9.5, 4.6))
-    fig.subplots_adjust(left=0.3, right=0.98, top=0.7, bottom=0.14)
+    fig, ax = plt.subplots(figsize=(10.5, 4.6))
+    fig.subplots_adjust(left=0.27, right=0.98, top=0.7, bottom=0.14)
     ax.imshow(rho, cmap=DIVERGING, vmin=-0.45, vmax=0.45, aspect="auto")
     for i in range(len(CT_FEATURES)):
         for j in range(len(ys)):
@@ -774,12 +783,12 @@ def fig_ct_translation(cfg, mat):
     sig = mat[(mat.q_value < 0.05) & mat.x.isin(CT_FEATURES) & mat.y.isin(ys)].sort_values("rho", key=np.abs, ascending=False)
     if len(sig):
         g = sig.iloc[0]
-        t = f"Drill tracking links most to {short_y[g.y]}: {short_x[g.x]} rho {g.rho:+.2f}"
+        t = f"{short_x[g.x][0].upper() + short_x[g.x][1:]} links to {short_y[g.y]} (rho {g.rho:+.2f})"
         t += f"; {len(sig) - 1} other cell{'s' if len(sig) != 2 else ''} pass FDR" if len(sig) > 1 else "; no other cell passes FDR"
     else:
         t = "No drill-tracking feature links to on-field performance after FDR correction"
     _title(fig, t, "Within-position Spearman rho, drill-tracking feature vs season-long on-field metric (* = FDR q < 0.05); split time sign-flipped")
-    fig.text(0.3, 0.04, "Blue = better drill movement goes with better on-field performance; orange = the reverse.", fontsize=8, color=INK2)
+    fig.text(0.27, 0.04, "Blue = better drill movement goes with better on-field performance; orange = the reverse.", fontsize=8, color=INK2)
     _save(fig, cfg, "fig21_ct_onfield_translation.png", "combine_tracking_6.csv + player_play regular season 2023-2025")
 
 
@@ -824,11 +833,10 @@ def make_all_figures(cfg: Config) -> None:
         fig_ct_reliability(cfg, pd.read_csv(m / "ct_reliability.csv"))
     if (m / "ct_onfield_translation_matrix.csv").exists():
         fig_ct_translation(cfg, pd.read_csv(m / "ct_onfield_translation_matrix.csv"))
-    if (m / "regression_ct_comparison.csv").exists() and (m / "classification_delong.csv").exists():
+    if (m / "ct_best_vs_best.csv").exists() and (m / "classification_pairwise_tests.csv").exists():
         tests = pd.read_csv(m / "classification_pairwise_tests.csv")
         if tests.feature_set.astype(str).str.startswith("combine_draft_ct vs").any():
-            fig_ct_value(cfg, m, pd.read_csv(m / "regression_summary.csv"), tests, pd.read_csv(m / "classification_delong.csv"),
-                         cfg["cv"]["outer_splits"] * cfg["cv"]["outer_repeats"])
+            fig_ct_value(cfg, m, tests, cfg["cv"]["outer_splits"] * cfg["cv"]["outer_repeats"])
     if (m / "classification_summary.csv").exists():
         clf = pd.read_csv(m / "classification_summary.csv")
         fig_classification_auc(cfg, pd.read_csv(m / "classification_fold_scores.csv"), clf)

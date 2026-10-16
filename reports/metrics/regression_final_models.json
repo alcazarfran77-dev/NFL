@@ -67,5 +67,78 @@
     "inner_rmse": 0.1778241746114695,
     "target": "soe_eb",
     "registered_as": "cgmt-onfield-wrte-separation"
+  },
+  "defensive_line_ct": {
+    "model": "random_forest",
+    "params": {
+      "model__max_depth": 3,
+      "model__max_features": 0.33,
+      "model__min_samples_leaf": 3,
+      "model__n_estimators": 200
+    },
+    "inner_rmse": 8.715060083733137,
+    "target": "sbi",
+    "registered_as": "cgmt-snap-burst-regressor-dl-ct",
+    "feature_set": "athletic_ct",
+    "alias": "challenger"
+  },
+  "dl_getoff_ct": {
+    "model": "xgboost",
+    "params": {
+      "model__colsample_bytree": 0.8,
+      "model__learning_rate": 0.03,
+      "model__max_depth": 2,
+      "model__min_child_weight": 8,
+      "model__n_estimators": 200,
+      "model__reg_lambda": 1.0,
+      "model__subsample": 0.8
+    },
+    "inner_rmse": 0.056653179151221075,
+    "target": "goe_eb",
+    "registered_as": "cgmt-onfield-dl-getoff-ct",
+    "feature_set": "athletic_ct",
+    "alias": "challenger"
+  },
+  "dl_pressure_ct": {
+    "model": "random_forest",
+    "params": {
+      "model__max_depth": 3,
+      "model__max_features": 0.33,
+      "model__min_samples_leaf": 3,
+      "model__n_estimators": 200
+    },
+    "inner_rmse": 0.011632320924579647,
+    "target": "proe_eb",
+    "registered_as": "cgmt-onfield-dl-pressure-ct",
+    "feature_set": "athletic_ct",
+    "alias": "challenger"
+  },
+  "ol_protection_ct": {
+    "model": "random_forest",
+    "params": {
+      "model__max_depth": 3,
+      "model__max_features": 0.33,
+      "model__min_samples_leaf": 10,
+      "model__n_estimators": 200
+    },
+    "inner_rmse": 0.01811244668017642,
+    "target": "ppoe_eb",
+    "registered_as": "cgmt-onfield-ol-protection-ct",
+    "feature_set": "athletic_ct",
+    "alias": "challenger"
+  },
+  "wrte_separation_ct": {
+    "model": "random_forest",
+    "params": {
+      "model__max_depth": 3,
+      "model__max_features": 0.33,
+      "model__min_samples_leaf": 3,
+      "model__n_estimators": 200
+    },
+    "inner_rmse": 0.1731889385396196,
+    "target": "soe_eb",
+    "registered_as": "cgmt-onfield-wrte-separation-ct",
+    "feature_set": "athletic_ct",
+    "alias": "challenger"
   }
 }

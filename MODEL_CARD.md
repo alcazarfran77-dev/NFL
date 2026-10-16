@@ -1,15 +1,12 @@
-# Model card — CGMT v2.1.0
+# Model card — CGMT v2.2.0
 
 Release run: clean MLflow store `mlflow.db`, experiment `cgmt-combine-translation`,
-data_version `dfc567c4ffe3` (seven raw files), seed 42. All scores are nested-CV out-of-sample
-(5 folds x 3 repeats) unless stated.
+data_version `d63395440694` (eight raw files, incl. Combine drill tracking), seed 42, 83 runs,
+15 registered models. All scores are nested-CV out-of-sample (5 folds x 3 repeats) unless stated.
+Every v2.0.0 model and score below reproduces exactly; v2.2.0 adds the drill-tracking challengers.
 
-v2.1.0 adds a data contract that checks the raw files against the provider's data structure spec
-(0 errors, 23 warnings; see the README). The models' inputs are identical, so the
-models are the v2.0.0 runs (`pipeline_version = 2.0.0`). When the spec's `combine_tracking.csv`
-arrives, the pipeline also trains drill-tracking challengers (`<regressor>-ct@challenger`,
-`cgmt-starter-classifier-combine-tracking@challenger`). The champion changes only if the
-tracking set beats Combine + draft on mean AUC with DeLong p < 0.05.
+The raw files are checked against the provider's data structure spec on every run (data contract:
+370 checks, 0 errors, 26 warnings; see the README).
 
 ## Registered models
 
@@ -24,6 +21,9 @@ tracking set beats Combine + draft on mean AUC with DeLong p < 0.05.
 | `cgmt-onfield-dl-pressure@champion` (v2.0) | DL pressure rate over expected | 89 DL | Random forest | 200 trees, depth 6, max features 0.33, min leaf 3 | No better than baseline (pooled R^2 0.05 [-0.13, 0.17]) |
 | `cgmt-onfield-ol-protection@champion` (v2.0) | OL pressure probability over expected | 70 OL | Random forest | 200 trees, depth 3, max features 0.33, min leaf 10 | No better than baseline (pooled R^2 -0.01) |
 | `cgmt-onfield-wrte-separation@champion` (v2.0) | WR/TE separation over expected (yd) | 96 WR/TE | Ridge | alpha = 100 | RMSE 0.169 vs 0.186 baseline; pooled R^2 0.19 [-0.01, 0.30] |
+| `cgmt-onfield-dl-getoff-ct@challenger` (v2.2) | DL get-off over expected (s) | 88 DL, + drill tracking | XGBoost | 200 trees, depth 2, lr 0.03, min child weight 8 | RMSE 0.057 vs 0.060 without tracking; pooled R^2 0.23 [0.04, 0.37]; better in 12 of 15 folds (corrected t p = 0.19) |
+| `cgmt-starter-classifier-combine-tracking@challenger` (v2.2) | P(starter) | 510 prospects, Combine + draft + drill tracking | XGBoost | 200 trees, depth 2, lr 0.03, min child weight 3 | ROC-AUC 0.913 vs 0.915 without tracking (DeLong p = 0.21) |
+| `cgmt-snap-burst-regressor-dl-ct`, `cgmt-onfield-{dl-pressure,ol-protection,wrte-separation}-ct` @challenger (v2.2) | as their champions | + drill tracking | best of the four per task | see `regression_final_models.json` | No gain over the champion (R^2 change -0.02 to -0.09) |
 
 Input: a pandas DataFrame with `combine_position` plus the feature columns of the
 chosen feature set (`cgmt.features.FEATURE_SETS`); the logged signature and input
@@ -38,6 +38,9 @@ example define the exact schema. Missing drills are allowed (imputed in-pipeline
 - **On-field regressors (v2.0):** project a prospect's season-long on-field performance from his
   Combine profile; useful for DL get-off and WR/TE separation only. The DL-pressure and
   OL-protection models are registered for completeness and do not beat the position mean.
+- **Drill-tracking challengers (v2.2):** the DL get-off challenger is the one candidate for promotion. It is
+  better in 12 of 15 folds, but the gain is not significant under the corrected resampled t-test, which is the
+  bar for replacing a champion. It needs the five `ct_*` features from `cgmt.combine_tracking` at inference.
 - **Not intended:** ranking WRs or DBs by snap burst (the metric is not a stable trait for
   them in this data); any use of the movement or on-field challengers for draft decisions
   (their features exist only after the draft).
@@ -61,7 +64,8 @@ example define the exact schema. Missing drills are allowed (imputed in-pipeline
 - Tracking covers late-season and playoff games only (the spec describes full 2023-2025 season files;
   2024-2025 Week 18 + playoff parts were delivered), with no opponents. On-field metrics cover
   the 2023-2025 regular seasons, with "expected" computed from prospects' plays, not the league.
-- Drill movement is measured by official results only: the spec's Combine drill tracking was not delivered.
+- Drill tracking: the start of a tracked attempt is not repeatable, so start-timed drill metrics are not used.
+  Shuttle and 3-cone reliability rests on about 40 players with two attempts.
 - The on-field challenger is circular by design (performance and starts share seasons).
 - Pickled with cloudpickle (the pipeline contains a project transformer): load only from this
   trusted registry.

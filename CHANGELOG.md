@@ -14,6 +14,49 @@ the report can be traced to the exact code and data that produced it.
 Versions 0.1.0–0.3.0 were development steps made before the repository was initialised
 (first commit = 0.4.0); they are recorded so the reasoning behind each decision is not lost.
 
+## [2.2.0] - 2026-10-16
+
+MINOR: the spec's Combine drill tracking arrives as `combine_tracking_6.csv` and enters the pipeline.
+`data_version` changes to `d63395440694` (eight raw files). No metric or target definition changes. Every
+v2.0.0 number in `reports/metrics/` reproduces exactly: the same rows of the summary, fold, test, DeLong and
+importance tables, and the same registered champions. Drill tracking adds new rows and files only.
+
+### Added
+- **`combine_tracking_6.csv`** (spec File 3): 463,189 frames, 6,310 drill attempts and all 510 prospects, as
+  the spec states. The contract now runs 370 checks with 0 errors and 26 warnings. The missing-file warning is
+  gone, and four range warnings are new. The 40-yard lane lies outside the field's 0-53.3 yd frame, and thrown
+  balls exceed the player speed, acceleration and distance ranges. Ball rows are dropped by R16.
+- **Calibration of the drill features on real attempts** (`attempt_reliability`, `ct_reliability.csv`,
+  figure 19). The start of a tracked attempt does not repeat between a player's two 40s (0-5 yd r = 0.16, 10-yd
+  split timed from the first frame 0.23), so start-timed metrics were dropped. A metric becomes a feature only
+  if it repeats at r >= 0.5 (`combine_tracking_rules.min_reliability`), with one feature per construct. That
+  gives five features:
+  40 5-10 yd split (0.87), 40 top speed (0.99), speed kept through the shuttle turns (0.54), and position-drill
+  top speed (0.78) and acceleration (0.55), both z-scored within each drill name. The 40 features reproduce the
+  stopwatch (top speed vs official 40: rho -0.97). Position-drill speed is mostly new information (rho -0.18
+  with the 40).
+- Translation (`ct_official_validity.csv`, `ct_translation_matrix.csv`, `ct_onfield_translation_matrix.csv`,
+  figure 21). Position-drill top speed is the only drill-tracking feature linked to season-long DL get-off
+  after FDR correction (rho +0.38, q = 0.006, 88 DL). The tracked 40 features reach rho +0.32 to +0.33
+  (q = 0.056).
+- **Does drill tracking improve the models?** (`ct_best_vs_best.csv`, figure 20; best model in each arm, same
+  players and folds):
+  - DL get-off over expected: R² +0.096 -> +0.168 (random forest -> XGBoost; +0.072, 95% CI -0.040 to +0.183,
+    corrected t p = 0.19, better in 12 of 15 folds, Wilcoxon p = 0.008). Pooled out-of-fold R² 0.13 -> 0.23
+    [0.04, 0.37]. RMSE 0.0597 -> 0.0570 s. Position-drill top speed becomes the model's most important feature.
+  - DL snap burst, DL pressure, OL protection and WR/TE separation: no gain (R² -0.02 to -0.09, all p >= 0.35).
+  - Starter classifier: AUC 0.915 -> 0.913 (XGBoost; corrected t p = 0.59, DeLong p = 0.21). The champion stays
+    Combine + draft.
+- Registry: `<regressor>-ct@challenger` for the five game targets and
+  `cgmt-starter-classifier-combine-tracking@challenger`. Nothing is promoted, because no gain passes the
+  corrected t-test at 0.05. The DL get-off challenger is the candidate to watch.
+- `ct_best_vs_best()` runs after the models and in `--stage stats`. Figures 19-21. One new test (33 in total).
+
+### Release notes
+- Trained from a clean MLflow store: 83 runs tagged `git_commit = 5d035d1`, `pipeline_version = 2.2.0` and
+  `data_version = d63395440694`, with 15 registered models. Afterwards, `ct_best_vs_best` and figure fixes were
+  added and applied with `--stage stats` and `--stage figures`, without retraining.
+
 ## [2.1.0] - 2026-10-16
 
 MINOR: the provider's data structure spec (`docs/Data_structure_CSV_files.docx`) becomes a

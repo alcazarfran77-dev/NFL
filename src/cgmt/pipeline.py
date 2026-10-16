@@ -722,6 +722,75 @@ def _summarise(results: dict, metrics: list[str], cfg: Config, task: str):
 
 
 # ----------------------------------------------------------------------------- stats (no retraining)
+def ct_best_vs_best(cfg: Config) -> pd.DataFrame | None:
+    """v2.2.0: does drill tracking improve the best pipeline? Best learned model with vs without, same folds.
+
+    Regression: champion = lowest mean RMSE among learned models in each arm (as the registry picks it);
+    paired corrected resampled t-test on outer-fold R² and RMSE (fold sizes n(k-1)/k and n/k).
+    Classification (all prospects): best combine_draft_ct vs best combine_draft by mean AUC; corrected t
+    on fold AUCs and DeLong on the out-of-fold predictions. Each arm picks its best of the same candidates,
+    so selection favours neither side.
+    """
+    m = cfg.path("metrics")
+    if not (m / "regression_ct_comparison.csv").exists():
+        return None
+    k = cfg["cv"]["outer_splits"]
+    reg = pd.read_csv(m / "regression_summary.csv")
+    rows = []
+    for pop in [p for p in reg.population.unique() if f"{p}_ct" in set(reg.population)]:
+        arms = {}
+        for arm, name in (("without", pop), ("with", f"{pop}_ct")):
+            s = reg[(reg.population == name) & (reg.model != "position_mean")].sort_values("rmse_mean").iloc[0]
+            arms[arm] = (s.model, {mt: pd.read_csv(m / f"regression_fold_{name}_{mt}.csv")[s.model].to_numpy() for mt in ("r2", "rmse")})
+        n = int(reg[reg.population == pop].n.iloc[0])
+        n_test = round(n / k)
+        row = {"task": pop, "kind": "regression", "n": n, "model_without": arms["without"][0], "model_with": arms["with"][0]}
+        for mt, hib in (("r2", True), ("rmse", False)):
+            a, b = arms["with"][1][mt], arms["without"][1][mt]
+            t = pairwise_model_tests(pd.DataFrame({"with": a, "without": b}), mt, n - n_test, n_test, higher_is_better=hib).iloc[0]
+            se = abs(t.mean_diff_a_minus_b / t.t_corrected) if t.t_corrected else np.nan
+            half = se * sst.t.ppf(0.975, len(a) - 1)
+            row[f"{mt}_folds_better"] = int(((a > b) if hib else (a < b)).sum())
+            row.update({f"{mt}_without": b.mean(), f"{mt}_with": a.mean(), f"{mt}_diff": t.mean_diff_a_minus_b,
+                        f"{mt}_diff_ci_low": t.mean_diff_a_minus_b - half, f"{mt}_diff_ci_high": t.mean_diff_a_minus_b + half,
+                        f"{mt}_p_corrected_t": t.p_corrected_t, f"{mt}_p_wilcoxon": t.p_wilcoxon})
+        rows.append(row)
+    clf_path = m / "classification_summary.csv"
+    if clf_path.exists():
+        clf = pd.read_csv(clf_path)
+        a_ = clf[(clf.population == "all_prospects")]
+        if "combine_draft_ct" in set(a_.feature_set):
+            folds = pd.read_csv(m / "classification_fold_scores.csv")
+            oof = pd.read_parquet(m / "classification_oof.parquet")
+            best = {fs: a_[a_.feature_set == fs].sort_values("roc_auc_mean").iloc[-1].model for fs in ("combine_draft", "combine_draft_ct")}
+
+            def fold(fs):
+                return folds[(folds.population == "all_prospects") & (folds.feature_set == fs) & (folds.model == best[fs])].roc_auc.to_numpy()
+
+            def oofp(fs):
+                o = oof[(oof.population == "all_prospects") & (oof.feature_set == fs) & (oof.model == best[fs])]
+                return o.groupby("row").agg(y=("y", "first"), p=("pred", "mean"))
+
+            n = int(a_.n.iloc[0])
+            n_test = round(n / k)
+            a, b = fold("combine_draft_ct"), fold("combine_draft")
+            t = pairwise_model_tests(pd.DataFrame({"with": a, "without": b}), "roc_auc", n - n_test, n_test).iloc[0]
+            se = abs(t.mean_diff_a_minus_b / t.t_corrected) if t.t_corrected else np.nan
+            half = se * sst.t.ppf(0.975, len(a) - 1)
+            ow, ob = oofp("combine_draft_ct"), oofp("combine_draft")
+            dl = delong_test(ow.y.to_numpy(), ow.p.to_numpy(), ob.p.reindex(ow.index).to_numpy())
+            rows.append({"task": "starter_all_prospects", "kind": "classification", "n": n,
+                         "model_without": best["combine_draft"], "model_with": best["combine_draft_ct"],
+                         "roc_auc_folds_better": int((a > b).sum()),
+                         "roc_auc_without": b.mean(), "roc_auc_with": a.mean(), "roc_auc_diff": t.mean_diff_a_minus_b,
+                         "roc_auc_diff_ci_low": t.mean_diff_a_minus_b - half, "roc_auc_diff_ci_high": t.mean_diff_a_minus_b + half,
+                         "roc_auc_p_corrected_t": t.p_corrected_t, "roc_auc_p_wilcoxon": t.p_wilcoxon,
+                         "oof_auc_without": dl["auc_2"], "oof_auc_with": dl["auc_1"], "p_delong": dl["p_value"]})
+    out = pd.DataFrame(rows)
+    _save(out, cfg, "ct_best_vs_best.csv", key="metrics")
+    return out
+
+
 def stage_stats(cfg: Config) -> None:
     """Recompute the rank-based omnibus tests from saved outer-fold scores.
 
@@ -743,6 +812,8 @@ def stage_stats(cfg: Config) -> None:
         wide = g.pivot(index="fold", columns="model", values="roc_auc")
         cf[f"{pop}/{fs}"] = friedman(wide, higher_is_better=True)
     _dump(cf, cfg, "classification_friedman.json")
+    if ct_best_vs_best(cfg) is not None:
+        log.info("stats: drill tracking best-vs-best comparison written")
     log.info("stats: recomputed Friedman tests from saved fold scores")
 
 
@@ -776,6 +847,7 @@ def main(argv: list[str] | None = None) -> None:
     if args.stage in ("all", "models"):
         out["regression"] = stage_regression(cfg, d)
         out["classification"] = stage_classification(cfg, d)
+        ct_best_vs_best(cfg)
     if args.stage in ("all", "figures"):
         from .viz import make_all_figures
         make_all_figures(cfg)
