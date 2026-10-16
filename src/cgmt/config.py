@@ -27,8 +27,7 @@ class Config:
     def path(self, key: str) -> Path:
         """Absolute path for an entry under `paths`, created if it is a directory."""
         p = PROJECT_ROOT / self.raw["paths"][key]
-        if p.suffix == "":
-            p.mkdir(parents=True, exist_ok=True)
+        (p if p.suffix == "" else p.parent).mkdir(parents=True, exist_ok=True)
         return p
 
 

@@ -43,6 +43,14 @@ LABELS = {
     "arm_length": "Arm length", "combine_height": "Height", "power_conference": "Power conference", "n_drills_run": "Drills run",
     "sbi": "SBI", "top_speed_z": "Top speed (game)", "max_cut_deg_z": "Sharpest cut (game)", "burst_1s_z": "Distance at 1 s (game)",
     "get_off_1s_z": "Get-off (game)", "peak_accel_2s_z": "Peak accel (game)", "max_decel_z": "Max braking (game)",
+    "goe_eb": "Get-off over\nexpected (DL)", "proe_eb": "Pressure rate\nover exp. (DL)", "ppoe_eb": "Pressure prob.\nover exp. (OL)",
+    "paoe_eb": "Pressures allowed\nover exp. (OL)", "soe_eb": "Separation\nover exp. (WR/TE)", "neg_log_pick": "Draft capital (earlier pick)",
+    "goe_z": "Get-off over exp. (game)", "proe_z": "Pressure over exp. (game)", "ppoe_z": "Protection over exp. (game)",
+    "soe_z": "Separation over exp. (game)", "proj_goe": "Projected get-off", "proj_proe": "Projected pressure",
+    "proj_ppoe": "Projected protection", "proj_soe": "Projected separation",
+    "onfield_target_goe": "Projected get-off", "onfield_target_proe": "Projected pressure",
+    "onfield_target_ppoe": "Projected protection", "onfield_target_soe": "Projected separation",
+    "combine_draft_proj": "Combine + draft\n+ projected on-field", "combine_draft_perf": "Combine + draft\n+ on-field performance",
     "combine": "Combine only", "combine_draft": "Combine + draft", "combine_draft_mov": "Combine + draft\n+ game movement",
 }
 
@@ -368,78 +376,95 @@ def fig_regression_cv(cfg, m_dir, summary):
     _save(fig, cfg, "fig10_regression_cv.png", "Snap Burst Index from Combine measurables and drills")
 
 
-def fig_classification_auc(cfg, folds):
-    pops = [("all_prospects", ["combine", "combine_draft"], "A. All prospects (n = 510)"),
-            ("tracked_subset", ["combine_draft", "combine_draft_mov"], "B. Players with tracking (n = 221)")]
+EXPERIMENT_TITLES = {"all_prospects": "All prospects", "tracked_subset": "Players with tracking",
+                     "onfield_subset": "Players with on-field metrics"}
+EXPERIMENT_SETS = {"all_prospects": ["combine", "combine_draft", "combine_draft_proj"],
+                   "tracked_subset": ["combine_draft", "combine_draft_mov"],
+                   "onfield_subset": ["combine_draft", "combine_draft_perf"]}
+SET_COLORS = {"combine": MUTED, "combine_draft": INK2, "combine_draft_proj": ORANGE, "combine_draft_mov": ACCENT,
+              "combine_draft_perf": ACCENT}
+
+
+def _experiments(folds):
+    return [(e, [f for f in EXPERIMENT_SETS[e] if f in set(folds[folds.population == e].feature_set)])
+            for e in EXPERIMENT_SETS if e in set(folds.population)]
+
+
+def fig_classification_auc(cfg, folds, summary):
     models = ["logistic_regression", "random_forest", "xgboost"]
-    fig, axes = plt.subplots(1, 2, figsize=(11, 4.6), sharey=True)
-    fig.subplots_adjust(left=0.07, right=0.98, top=0.78, bottom=0.2, wspace=0.08)
-    for ax, (pop, fsets, title) in zip(axes, pops):
+    exps = _experiments(folds)
+    fig, axes = plt.subplots(1, len(exps), figsize=(5.2 * len(exps), 4.9), sharey=True)
+    axes = np.atleast_1d(axes)
+    fig.subplots_adjust(left=0.06, right=0.99, top=0.78, bottom=0.24, wspace=0.08)
+    for k, (ax, (pop, fsets)) in enumerate(zip(axes, exps)):
+        width = 0.7 / len(fsets)
         for j, fs in enumerate(fsets):
             for i, m in enumerate(models):
                 v = folds[(folds.population == pop) & (folds.feature_set == fs) & (folds.model == m)].roc_auc.to_numpy()
                 mu, half = _mean_ci(v)
-                x = i + (j - 0.5) * 0.32
-                col = ACCENT if j == 1 else MUTED
-                ax.errorbar(x, mu, yerr=half, fmt="o", color=col, ecolor=col, capsize=4, markersize=7, elinewidth=1.8,
+                x = i + (j - (len(fsets) - 1) / 2) * width
+                col = SET_COLORS[fs]
+                ax.errorbar(x, mu, yerr=half, fmt="o", color=col, ecolor=col, capsize=3, markersize=6, elinewidth=1.6,
                             label=LABELS[fs].replace("\n", " ") if i == 0 else None)
-                ax.text(x, mu + half + 0.012, f"{mu:.2f}", ha="center", fontsize=8, color=INK)
-        ax.set_xticks(range(len(models)), [LABELS[m] for m in models])
-        ax.set_title(title)
-        ax.legend(loc="lower left", fontsize=8.5)
+                ax.text(x, min(mu + half + 0.01, 0.985), f"{mu:.2f}", ha="center", fontsize=7.5, color=INK)
+        n = int(summary[summary.population == pop].n.iloc[0])
+        ax.set_xticks(range(len(models)), [LABELS[m] for m in models], fontsize=8.5)
+        ax.set_title(f"{chr(65 + k)}. {EXPERIMENT_TITLES[pop]} (n = {n})", fontsize=9.5)
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.1), fontsize=7.5, ncol=1)
         ax.set_ylim(0.6, 1.0)
     axes[0].set_ylabel("ROC-AUC, outer folds (mean, 95% CI)")
-    a = folds[(folds.population == "all_prospects")].groupby("feature_set").roc_auc.mean()
-    b = folds[(folds.population == "tracked_subset")].groupby("feature_set").roc_auc.mean()
-    _title(fig, f"Draft capital lifts AUC from {a['combine']:.2f} to {a['combine_draft']:.2f}; game movement adds {b['combine_draft_mov'] - b['combine_draft']:+.3f}",
-           "Predicting a starter (started 50%+ of available games); nested CV, 5 folds x 3 repeats")
-    _save(fig, cfg, "fig11_classification_auc.png", "players + combine_results + player_career_successes")
+    g = folds.groupby(["population", "feature_set"]).roc_auc.mean()
+    t = f"Draft capital lifts AUC from {g[('all_prospects', 'combine')]:.2f} to {g[('all_prospects', 'combine_draft')]:.2f}"
+    if ("onfield_subset", "combine_draft_perf") in g.index:
+        t += f"; on-field performance adds {g[('onfield_subset', 'combine_draft_perf')] - g[('onfield_subset', 'combine_draft')]:+.3f}"
+    _title(fig, t, "Predicting a starter (started 50%+ of available games); nested CV, 5 folds x 3 repeats; same folds within a panel")
+    _save(fig, cfg, "fig11_classification_auc.png", "players + combine_results + player_career_successes + player_play")
 
 
 def fig_roc(cfg, oof, summary):
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4.8))
-    fig.subplots_adjust(left=0.08, right=0.98, top=0.8, bottom=0.12, wspace=0.25)
-    pops = [("all_prospects", ["combine", "combine_draft"], "A. All prospects"),
-            ("tracked_subset", ["combine_draft", "combine_draft_mov"], "B. Players with tracking")]
-    for ax, (pop, fsets, title) in zip(axes, pops):
-        models = []
-        for j, fs in enumerate(fsets):
+    exps = _experiments(summary)
+    fig, axes = plt.subplots(1, len(exps), figsize=(4.9 * len(exps), 4.9))
+    axes = np.atleast_1d(axes)
+    fig.subplots_adjust(left=0.06, right=0.99, top=0.8, bottom=0.12, wspace=0.25)
+    for k, (ax, (pop, fsets)) in enumerate(zip(axes, exps)):
+        for fs in fsets:
             s = summary[(summary.population == pop) & (summary.feature_set == fs)].sort_values("roc_auc_mean", ascending=False).iloc[0]
-            models.append(LABELS[s.model])
             o = oof[(oof.population == pop) & (oof.feature_set == fs) & (oof.model == s.model)]
             o = o.groupby("row").agg(y=("y", "first"), p=("pred", "mean"))
             fpr, tpr, _ = roc_curve(o.y, o.p)
-            col = ACCENT if j == 1 else INK2
-            ax.plot(fpr, tpr, color=col, linewidth=2,
-                    label=f"{LABELS[fs].replace(chr(10), ' ')}: {s.oof_auc:.2f} [{s.oof_auc_ci_low:.2f}, {s.oof_auc_ci_high:.2f}]")
+            ax.plot(fpr, tpr, color=SET_COLORS[fs], linewidth=1.8,
+                    label=f"{LABELS[fs].replace(chr(10), ' ')} ({LABELS[s.model]}): {s.oof_auc:.2f} [{s.oof_auc_ci_low:.2f}, {s.oof_auc_ci_high:.2f}]")
         ax.plot([0, 1], [0, 1], color=MUTED, linewidth=0.8, linestyle=(0, (4, 3)))
         ax.set_xlabel("False positive rate")
-        ax.set_ylabel("True positive rate")
-        ax.set_title(f"{title} ({' / '.join(dict.fromkeys(models))})")
-        ax.legend(loc="lower right", fontsize=7.5, title="ROC-AUC [95% CI]", title_fontsize=7.5)
+        ax.set_ylabel("True positive rate" if k == 0 else "")
+        ax.set_title(f"{chr(65 + k)}. {EXPERIMENT_TITLES[pop]}", fontsize=9.5)
+        ax.legend(loc="lower right", fontsize=6.5, title="ROC-AUC [95% CI]", title_fontsize=7)
     _title(fig, "Out-of-fold ROC curves of the best model per feature set",
            "Predictions averaged over the 3 CV repeats; brackets = bootstrap 95% CI (2,000 stratified resamples)")
     _save(fig, cfg, "fig12_roc_curves.png", "nested CV out-of-fold predictions")
 
 
-def fig_importance(cfg, imp_clf, imp_reg, finals, reg_champ):
-    imp_reg = imp_reg[imp_reg.population == "defensive_line"]
+def _nice(f):
+    if f.endswith("_missing"):
+        return f"{LABELS.get(f[:-8], f[:-8]).replace(chr(10), ' ')} not run"
+    return LABELS.get(f, f).replace("\n", " ").replace("_", " ")
+
+
+def fig_importance(cfg, imp_clf, imp_reg, champ_clf_model, reg_champ, reg_pop="dl_getoff", reg_label="DL get-off regressor",
+                   unit="rise in RMSE (s)"):
+    imp_reg = imp_reg[imp_reg.population == reg_pop]
     fig, (a1, a2) = plt.subplots(1, 2, figsize=(11.5, 5.2))
     fig.subplots_adjust(left=0.18, right=0.98, top=0.8, bottom=0.15, wspace=0.75)
-    def nice(f):
-        if f.endswith("_missing"):
-            return f"{LABELS.get(f[:-8], f[:-8]).replace(chr(10), ' ')} not run"
-        return LABELS.get(f, f).replace("\n", " ").replace("_", " ")
-    for ax, imp, title, unit in [(a1, imp_clf, f"A. Starter classifier ({LABELS[finals['champion']['model']]})", "drop in ROC-AUC"),
-                                 (a2, imp_reg, f"B. DL snap-burst regressor ({LABELS[reg_champ]})", "rise in RMSE (SBI pts)")]:
+    for ax, imp, title, u in [(a1, imp_clf, f"A. Starter classifier ({LABELS[champ_clf_model]})", "drop in ROC-AUC"),
+                              (a2, imp_reg, f"B. {reg_label} ({LABELS[reg_champ]})", unit)]:
         top = imp.head(10).iloc[::-1]
         cols = [ACCENT if i == len(top) - 1 else MUTED for i in range(len(top))]
         ax.barh(range(len(top)), top.importance, xerr=top["std"], color=cols, ecolor=INK2, capsize=2, height=0.65)
-        ax.set_yticks(range(len(top)), [nice(f) for f in top.feature], fontsize=8.5)
-        ax.set_xlabel(f"Permutation importance ({unit})")
+        ax.set_yticks(range(len(top)), [_nice(f) for f in top.feature], fontsize=8.5)
+        ax.set_xlabel(f"Permutation importance ({u})")
         ax.set_title(title)
         ax.axvline(0, color=INK2, linewidth=0.8)
-    _title(fig, f"Draft pick dominates who starts; {nice(imp_reg.iloc[0].feature)} leads for DL snap burst",
+    _title(fig, f"Draft pick dominates who starts; {_nice(imp_reg.iloc[0].feature)} leads for {reg_label.replace(' regressor', '')}",
            "Permutation importance on the refit champion models (in-sample, descriptive), 20 shuffles each; bars = mean, lines = SD")
     _save(fig, cfg, "fig13_feature_importance.png", "registered champion models")
 
@@ -467,6 +492,139 @@ def fig_translation_gap(cfg, gap):
     _save(fig, cfg, "fig14_translation_gap.png", "nested-CV out-of-fold predictions of the champion regressor")
 
 
+# ----------------------------------------------------------------------------- on-field (v2.0.0)
+ONFIELD_NAMES = {"goe": "DL get-off over expected", "proe": "DL pressure rate over expected",
+                 "ppoe": "OL pressure prob. over expected", "paoe": "OL pressures allowed over exp.",
+                 "soe": "Separation over expected"}
+
+
+def fig_onfield_reliability(cfg, rel, track_rel, stab):
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(12, 5.0), gridspec_kw={"width_ratios": [1.5, 1]})
+    fig.subplots_adjust(left=0.24, right=0.97, top=0.8, bottom=0.13, wspace=0.6)
+    rows = [(f"{ONFIELD_NAMES[r.metric]} ({r.combine_position})" if r.metric == "soe" else ONFIELD_NAMES[r.metric],
+             max(r.icc, 0), int(r.players), "on-field") for r in rel.itertuples()]
+    tb = track_rel[track_rel.metric == "burst_2s"]
+    rows += [(f"Tracking snap burst ({r.combine_position})", max(r.icc, 0), int(r.players), "tracking") for r in tb.itertuples()]
+    rows.sort(key=lambda t: t[1])
+    for i, (name, v, n, kind) in enumerate(rows):
+        a1.barh(i, v, color=ACCENT if kind == "on-field" else MUTED, height=0.68)
+        a1.text(v + 0.015, i, f"{v:.2f}  (n={n})", va="center", fontsize=8, color=INK)
+    a1.set_yticks(range(len(rows)), [r[0] for r in rows], fontsize=8.5)
+    a1.set_xlim(0, 1.12)
+    a1.set_xlabel("ICC: share of variance that is real player difference")
+    a1.set_title("A. Stable trait? Blue = on-field (season), grey = tracking SBI", fontsize=9.5)
+    st = stab.sort_values("rho")
+    a2.barh(range(len(st)), st.rho, color=[ACCENT if p < 0.05 else MUTED for p in st.p_value], height=0.6)
+    for i, r in enumerate(st.itertuples()):
+        a2.text(r.rho + 0.02, i, f"{r.rho:+.2f} (n={r.players})", va="center", fontsize=8, color=INK)
+    a2.set_yticks(range(len(st)), [ONFIELD_NAMES[m].replace(" over expected", "").replace(" over exp.", "") for m in st.metric], fontsize=8.5)
+    a2.set_xlim(min(0, st.rho.min()) - 0.05, 1.0)
+    a2.axvline(0, color=INK2, linewidth=0.8)
+    a2.set_xlabel("Spearman rho, rookie vs later seasons")
+    a2.set_title("B. Rookie year vs later seasons", fontsize=9.5)
+    g = rel.set_index(["metric", "combine_position"]).icc
+    _title(fig, f"Season-long on-field metrics are stable traits (DL get-off ICC {g[('goe', 'DL')]:.2f}); 2-s tracking burst mostly is not",
+           "ICC by method of moments among players meeting the play minimum; panel B: 2023-2024 classes, blue = p < 0.05")
+    _save(fig, cfg, "fig15_onfield_reliability.png", "player_play regular season 2023-2025 + game_tracking")
+
+
+def fig_onfield_translation(cfg, mat):
+    xs = ["ten_yd_split", "forty", "broad_jump", "vertical", "short_shuttle", "three_cone", "bench_reps", "combine_weight",
+          "ngs_athleticism_score", "neg_log_pick"]
+    ys = ["goe_eb", "proe_eb", "ppoe_eb", "paoe_eb", "soe_eb"]
+    m = mat.set_index(["x", "y"])
+    rho = np.array([[m.loc[(x, y), "rho"] if (x, y) in m.index else np.nan for y in ys] for x in xs])
+    q = np.array([[m.loc[(x, y), "q_value"] if (x, y) in m.index else np.nan for y in ys] for x in xs])
+    fig, ax = plt.subplots(figsize=(9.5, 6.6))
+    fig.subplots_adjust(left=0.27, right=0.98, top=0.8, bottom=0.12)
+    ax.imshow(rho, cmap=DIVERGING, vmin=-0.45, vmax=0.45, aspect="auto")
+    for i in range(len(xs)):
+        for j in range(len(ys)):
+            if np.isfinite(rho[i, j]):
+                sig = q[i, j] < 0.05
+                ax.text(j, i, f"{rho[i, j]:+.2f}{'*' if sig else ''}", ha="center", va="center", fontsize=9,
+                        color=INK, fontweight="bold" if sig else "normal")
+    ax.axhline(len(xs) - 1.5, color=SURFACE, linewidth=4)
+    ax.set_xticks(range(len(ys)), [LABELS[y] for y in ys], fontsize=8.5)
+    ax.xaxis.tick_top()
+    ax.set_yticks(range(len(xs)), [LABELS[x] for x in xs], fontsize=9)
+    ax.grid(False)
+    ax.tick_params(length=0)
+    for s_ in ax.spines.values():
+        s_.set_visible(False)
+    g = mat[mat.y == "goe_eb"].sort_values("rho", ascending=False).iloc[0]
+    _title(fig, f"Drills predict DL get-off ({LABELS[g.x].lower()} rho {g.rho:+.2f}); OL protection tracks draft capital",
+           "Within-position Spearman rho, Combine result vs season-long on-field metric (* = FDR q < 0.05); times sign-flipped")
+    fig.text(0.27, 0.05, "Blue = better test (or earlier pick) goes with better on-field performance; orange = the reverse. Body weight as measured.",
+             fontsize=8, color=INK2)
+    _save(fig, cfg, "fig16_onfield_translation.png", "combine_results + player_play regular season 2023-2025")
+
+
+def fig_dl_chain(cfg, onfield, prospects, med):
+    df = onfield.drop(columns=["combine_position"]).merge(prospects, on="nfl_id")
+    df = df[(df.combine_position.astype(str) == "DL") & df.goe_eb.notna()]
+    role = df.nfl_position.astype(str).isin(["DT", "NT"])
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(11, 4.8))
+    fig.subplots_adjust(left=0.07, right=0.98, top=0.78, bottom=0.14, wspace=0.25)
+    for ax, x, y, xl, yl in [(a1, "ten_yd_split", "goe_eb", "10-yd split (s)", "Get-off over expected (s; + = quicker)"),
+                             (a2, "goe_eb", "proe_eb", "Get-off over expected (s; + = quicker)", "Pressure rate over expected")]:
+        t = df[[x, y]].dropna()
+        for mask, col, lab in [(~role, ACCENT, "Edge (DE/OLB)"), (role, INK2, "Interior (DT/NT)")]:
+            tt = df[mask][[x, y]].dropna()
+            ax.scatter(tt[x], tt[y], s=22, color=col, alpha=0.75, linewidths=0, label=lab)
+        b, a = np.polyfit(t[x], t[y], 1)
+        xs = np.linspace(t[x].min(), t[x].max(), 10)
+        ax.plot(xs, a + b * xs, color=INK, linewidth=1.4)
+        from scipy import stats
+        r, p = stats.spearmanr(t[x], t[y])
+        ax.text(0.02, 0.96, f"rho = {r:+.2f} (n = {len(t)})", transform=ax.transAxes, va="top", fontsize=9, color=INK)
+        ax.set_xlabel(xl)
+        ax.set_ylabel(yl)
+        ax.axhline(0, color=GRID, linewidth=0.8)
+    a1.set_title("A. Faster 10-yd split, quicker get-off in games")
+    a2.set_title("B. Quicker get-off, more pressure")
+    a1.legend(loc="lower left", fontsize=8)
+    r = med.set_index("x").loc["ten_yd_split"]
+    _title(fig, f"About {r.share_mediated:.0%} of the 10-yd split's link to pressure runs through in-game get-off",
+           f"Mediation on z-scores: indirect effect {abs(r.indirect_effect):.2f} SD [{abs(r.indirect_ci_high):.2f}, {abs(r.indirect_ci_low):.2f}] (bootstrap 95% CI); "
+           "defensive linemen with 20+ pass-rush snaps" if r.indirect_effect < 0 else
+           f"Mediation on z-scores: indirect effect {r.indirect_effect:.2f} SD [{r.indirect_ci_low:.2f}, {r.indirect_ci_high:.2f}] (bootstrap 95% CI); "
+           "defensive linemen with 20+ pass-rush snaps")
+    _save(fig, cfg, "fig17_dl_chain.png", "combine_results + player_play regular season 2023-2025")
+
+
+def fig_onfield_regression(cfg, m_dir, summary, tasks):
+    order = ["position_mean", "ridge", "random_forest", "xgboost"]
+    fig, axes = plt.subplots(1, len(tasks), figsize=(3.3 * len(tasks), 4.8), sharey=True)
+    axes = np.atleast_1d(axes)
+    fig.subplots_adjust(left=0.06, right=0.99, top=0.76, bottom=0.2, wspace=0.08)
+    rng = np.random.default_rng(cfg.seed)
+    best = {}
+    for k, (ax, task) in enumerate(zip(axes, tasks)):
+        pop = task["name"]
+        folds = pd.read_csv(m_dir / f"regression_fold_{pop}_r2.csv")
+        s = summary[summary.population == pop]
+        champ = s[s.model != "position_mean"].sort_values("rmse_mean").iloc[0].model
+        best[pop] = s.set_index("model").loc[champ]
+        for i, m in enumerate(order):
+            v = folds[m].to_numpy()
+            ax.scatter(i + rng.uniform(-0.12, 0.12, len(v)), v, s=9, color=MUTED, linewidths=0)
+            mu, half = _mean_ci(v)
+            col = ACCENT if m == champ else INK
+            ax.errorbar(i + 0.25, mu, yerr=half, fmt="o", color=col, ecolor=col, capsize=3, markersize=5, elinewidth=1.4)
+            ax.text(i + 0.33, float(np.clip(mu, -0.76, 0.76)), f"{mu:+.2f}", va="center", fontsize=7.5, color=col)
+        ax.axhline(0, color=INK2, linewidth=0.8)
+        ax.set_xticks(range(len(order)), [LABELS[m].replace("\n(baseline)", "") for m in order], fontsize=7.5, rotation=30, ha="right")
+        ax.set_title(f"{chr(65 + k)}. {task['label']}\n(n = {int(s.n.iloc[0])})", fontsize=8.5)
+        ax.set_xlim(-0.5, len(order) - 0.1)
+        ax.set_ylim(-0.8, 0.8)
+    axes[0].set_ylabel("Outer-fold R² (clipped at -0.8)")
+    g = best["dl_getoff"] if "dl_getoff" in best else next(iter(best.values()))
+    _title(fig, f"Combine testing predicts DL get-off (R² {g.r2_mean:+.2f}, {LABELS[g.name]}); pressure, protection and separation much less",
+           "Nested CV, 5 folds x 3 repeats; dots = outer folds, marker = mean with 95% CI; blue = lowest-RMSE learned model")
+    _save(fig, cfg, "fig18_onfield_regression.png", "Combine -> season-long on-field performance (player_play)")
+
+
 def make_all_figures(cfg: Config) -> None:
     _style()
     p, m, i = cfg.path("processed"), cfg.path("metrics"), cfg.path("interim")
@@ -489,10 +647,29 @@ def make_all_figures(cfg: Config) -> None:
         dl = reg[(reg.population == "defensive_line") & (reg.model != "position_mean")]
         champ = dl.sort_values("rmse_mean").iloc[0].model
         fig_translation_gap(cfg, pd.read_csv(m / "translation_gap.csv"))
+    onfield_ready = (p / "player_onfield_profiles.parquet").exists() and (m / "onfield_reliability.csv").exists()
+    if onfield_ready:
+        onfield = pd.read_parquet(p / "player_onfield_profiles.parquet")
+        fig_onfield_reliability(cfg, pd.read_csv(m / "onfield_reliability.csv"), pd.read_csv(m / "metric_reliability.csv"),
+                                pd.read_csv(m / "onfield_stability.csv"))
+        fig_onfield_translation(cfg, pd.read_csv(m / "onfield_translation_matrix.csv"))
+        fig_dl_chain(cfg, onfield, prospects, pd.read_csv(m / "onfield_mediation_dl.csv"))
+    if (m / "regression_summary.csv").exists() and onfield_ready:
+        reg = pd.read_csv(m / "regression_summary.csv")
+        tasks = [t for t in cfg["regression"].get("onfield_tasks", []) if t["name"] in set(reg.population)]
+        if tasks:
+            fig_onfield_regression(cfg, m, reg, tasks)
     if (m / "classification_summary.csv").exists():
         clf = pd.read_csv(m / "classification_summary.csv")
-        fig_classification_auc(cfg, pd.read_csv(m / "classification_fold_scores.csv"))
+        fig_classification_auc(cfg, pd.read_csv(m / "classification_fold_scores.csv"), clf)
         fig_roc(cfg, pd.read_parquet(m / "classification_oof.parquet"), clf)
         finals = json.loads((m / "classification_final_models.json").read_text())
-        fig_importance(cfg, pd.read_csv(m / "classification_importance_all_prospects_combine_draft.csv"),
-                       pd.read_csv(m / "regression_permutation_importance.csv"), finals, champ)
+        champ_entry = next(v for k, v in finals.items() if k.startswith("champion"))
+        reg = pd.read_csv(m / "regression_summary.csv")
+        if "dl_getoff" in set(reg.population):
+            pop, label, unit = "dl_getoff", "DL get-off regressor", "rise in RMSE (s)"
+        else:
+            pop, label, unit = "defensive_line", "DL snap-burst regressor", "rise in RMSE (SBI pts)"
+        rc = reg[(reg.population == pop) & (reg.model != "position_mean")].sort_values("rmse_mean").iloc[0].model
+        fig_importance(cfg, pd.read_csv(m / f"classification_importance_all_prospects_{champ_entry['feature_set']}.csv"),
+                       pd.read_csv(m / "regression_permutation_importance.csv"), champ_entry["model"], rc, pop, label, unit)

@@ -33,14 +33,16 @@ class PositionMedianImputer(BaseEstimator, TransformerMixin):
     """Fill numeric NaNs with the training-fold median of the player's position group.
 
     Falls back to the global training median when a group has no observed value
-    (e.g. offensive linemen rarely run the 3-cone in some folds).
+    (e.g. offensive linemen rarely run the 3-cone in some folds). Columns in `exclude`
+    (projector labels) pass through untouched.
     """
 
-    def __init__(self, group_col: str = GROUP_COL):
+    def __init__(self, group_col: str = GROUP_COL, exclude: tuple = ()):
         self.group_col = group_col
+        self.exclude = exclude
 
     def fit(self, X: pd.DataFrame, y=None):
-        num = X.drop(columns=[self.group_col]).select_dtypes("number")
+        num = X.drop(columns=[self.group_col, *[c for c in self.exclude if c in X.columns]]).select_dtypes("number")
         self.numeric_cols_ = list(num.columns)
         self.global_median_ = num.median()
         self.group_median_ = num.groupby(X[self.group_col].astype(str)).median()
@@ -60,12 +62,86 @@ class PositionMedianImputer(BaseEstimator, TransformerMixin):
         return np.asarray(self.numeric_cols_ + [self.group_col], dtype=object)
 
 
-def make_preprocessor(numeric_cols: list[str], include_position: bool = True) -> Pipeline:
-    transformers = [("num", StandardScaler(), numeric_cols)]
+PROJECTOR_PREFIX = "onfield_target_"
+
+
+class OnFieldProjector(BaseEstimator, TransformerMixin):
+    """Stacked Combine -> on-field projection (v2.0.0). Pre-draft safe.
+
+    Input columns named `onfield_target_<metric>` hold a player's observed on-field value
+    (NaN when not measured). They are used ONLY as labels: `fit` trains one Ridge model per
+    metric on the training rows that have a label, using the Combine columns. `transform`
+    replaces every label column by `proj_<metric>`, the projection from Combine columns alone
+    (0 for players outside the metric's position family). Training rows get out-of-fold
+    projections (`fit_transform`), so the downstream classifier sees the same kind of
+    noisy projection it will see on new players.
+    """
+
+    def __init__(self, alpha: float = 10.0, inner_folds: int = 5, random_state: int = 0, group_col: str = GROUP_COL):
+        self.alpha = alpha
+        self.inner_folds = inner_folds
+        self.random_state = random_state
+        self.group_col = group_col
+
+    def _split(self, X):
+        self.targets_ = [c for c in X.columns if c.startswith(PROJECTOR_PREFIX)]
+        self.features_ = [c for c in X.columns if c not in self.targets_ and c != self.group_col]
+
+    def _model(self):
+        return Pipeline([("scale", StandardScaler()), ("ridge", Ridge(alpha=self.alpha))])
+
+    def fit(self, X: pd.DataFrame, y=None):
+        self._split(X)
+        self.models_, self.positions_ = {}, {}
+        for t in self.targets_:
+            rows = X[t].notna()
+            self.positions_[t] = set(X.loc[rows, self.group_col].astype(str))
+            self.models_[t] = self._model().fit(X.loc[rows, self.features_], X.loc[rows, t]) if rows.sum() >= 10 else None
+        return self
+
+    def _project(self, X: pd.DataFrame, t: str, model) -> np.ndarray:
+        out = np.zeros(len(X))
+        if model is None:
+            return out
+        fam = X[self.group_col].astype(str).isin(self.positions_[t]).to_numpy()
+        if fam.any():
+            out[fam] = model.predict(X.loc[fam, self.features_])
+        return out
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        out = X.drop(columns=self.targets_).copy()
+        for t in self.targets_:
+            out[t.replace(PROJECTOR_PREFIX, "proj_")] = self._project(X, t, self.models_[t])
+        return out
+
+    def fit_transform(self, X: pd.DataFrame, y=None, **fit_params) -> pd.DataFrame:
+        self.fit(X)
+        out = self.transform(X)
+        for t in self.targets_:  # replace in-sample projections of labelled rows by out-of-fold ones
+            rows = np.flatnonzero(X[t].notna().to_numpy())
+            if len(rows) < 2 * self.inner_folds:
+                continue
+            col = t.replace(PROJECTOR_PREFIX, "proj_")
+            kf = KFold(self.inner_folds, shuffle=True, random_state=self.random_state)
+            for tr, te in kf.split(rows):
+                m = self._model().fit(X.iloc[rows[tr]][self.features_], X.iloc[rows[tr]][t])
+                out.iloc[rows[te], out.columns.get_loc(col)] = m.predict(X.iloc[rows[te]][self.features_])
+        return out
+
+
+def make_preprocessor(numeric_cols: list[str], include_position: bool = True,
+                      projector: dict | None = None) -> Pipeline:
+    targets = [c for c in numeric_cols if c.startswith(PROJECTOR_PREFIX)]
+    plain = [c for c in numeric_cols if c not in targets]
+    steps = [("impute", PositionMedianImputer(exclude=tuple(targets)))]
+    if targets:
+        steps.append(("project", OnFieldProjector(**(projector or {}))))
+        plain = plain + [t.replace(PROJECTOR_PREFIX, "proj_") for t in targets]
+    transformers = [("num", StandardScaler(), plain)]
     if include_position:
         transformers.append(("pos", OneHotEncoder(handle_unknown="ignore", sparse_output=False), [GROUP_COL]))
-    ct = ColumnTransformer(transformers, remainder="drop", verbose_feature_names_out=False)
-    return Pipeline([("impute", PositionMedianImputer()), ("encode", ct)])
+    steps.append(("encode", ColumnTransformer(transformers, remainder="drop", verbose_feature_names_out=False)))
+    return Pipeline(steps)
 
 
 def make_estimator(name: str, task: str, seed: int, pos_weight: float = 1.0):
@@ -84,12 +160,18 @@ def make_estimator(name: str, task: str, seed: int, pos_weight: float = 1.0):
     }[name]
 
 
-def make_pipeline(name: str, task: str, numeric_cols: list[str], seed: int, pos_weight: float = 1.0) -> Pipeline:
+def make_pipeline(name: str, task: str, numeric_cols: list[str], seed: int, pos_weight: float = 1.0,
+                  projector: dict | None = None) -> Pipeline:
     if name == "position_mean":  # baseline: position group one-hot only -> group means
         pre = make_preprocessor([], include_position=True)
     else:
-        pre = make_preprocessor(numeric_cols)
+        pre = make_preprocessor(numeric_cols, projector={**(projector or {}), "random_state": seed})
     return Pipeline([("prep", pre), ("model", make_estimator(name, task, seed, pos_weight))])
+
+
+def projector_params(cfg) -> dict:
+    c = cfg["classification"]
+    return {"alpha": float(c.get("projector_alpha", 10.0)), "inner_folds": int(c.get("projector_inner_folds", 5))}
 
 
 # ----------------------------------------------------------------------------- metrics
@@ -136,7 +218,7 @@ def nested_cv(model_name: str, feature_set_name: str, task: str, X: pd.DataFrame
     for fold, (tr, te) in enumerate(outer.split(X, strata)):
         Xtr, Xte, ytr, yte = X.iloc[tr], X.iloc[te], y.iloc[tr], y.iloc[te]
         pos_weight = float((ytr == 0).sum() / max((ytr == 1).sum(), 1)) if task == "classification" else 1.0
-        pipe = make_pipeline(model_name, task, numeric_cols, seed, pos_weight)
+        pipe = make_pipeline(model_name, task, numeric_cols, seed, pos_weight, projector_params(cfg))
         if task == "classification":
             inner = StratifiedKFold(cfg["cv"]["inner_splits"], shuffle=True, random_state=seed + fold)
             scoring = cfg["classification"]["scoring"]
@@ -166,7 +248,7 @@ def refit_final(model_name: str, task: str, X: pd.DataFrame, y: pd.Series, grid:
     """Tune on all data (5-fold inner CV) and refit: the model that gets registered."""
     numeric_cols = [c for c in X.columns if c != GROUP_COL]
     pos_weight = float((y == 0).sum() / max((y == 1).sum(), 1)) if task == "classification" else 1.0
-    pipe = make_pipeline(model_name, task, numeric_cols, seed, pos_weight)
+    pipe = make_pipeline(model_name, task, numeric_cols, seed, pos_weight, projector_params(cfg))
     if task == "classification":
         cv, scoring = StratifiedKFold(5, shuffle=True, random_state=seed), cfg["classification"]["scoring"]
     else:

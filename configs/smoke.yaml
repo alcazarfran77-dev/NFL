@@ -1,11 +1,12 @@
-# Fast configuration for CI and smoke tests: same code path, tiny CV and grids.
+# Fast configuration for CI and smoke tests: same code path, tiny CV and grids,
+# separate output folders so a smoke run never overwrites release outputs.
 project: cgmt
 seed: 42
 paths:
   raw: data/raw
-  interim: data/interim
-  processed: data/processed
-  manifest: data/manifest.json
+  interim: data/smoke/interim
+  processed: data/smoke/processed
+  manifest: data/smoke/manifest.json
   reports: reports
   figures: reports/smoke/figures
   metrics: reports/smoke/metrics
@@ -18,12 +19,14 @@ raw_files:
   tracking:
   - game_tracking_2024_2.csv
   - game_tracking_2025_2.csv
+  player_play: player_play_3.csv
 mlflow:
   tracking_uri: sqlite:///mlflow_smoke.db
   artifact_location: mlartifacts_smoke
   experiment: cgmt-smoke
   register_models: true
   regressor_name: cgmt-snap-burst-regressor
+  onfield_regressor_prefix: cgmt-onfield
   classifier_name: cgmt-starter-classifier
 business_rules:
   last_completed_season: 2025
@@ -90,6 +93,27 @@ tracking_rules:
   capacity_quantile: 0.8
   sbi_center: 50
   sbi_scale: 10
+performance_rules:
+  season_types:
+  - REG
+  exclude_nullified: true
+  families:
+    DL: DL
+    OL: OL
+    WR: WRTE
+    TE: WRTE
+  get_off_valid_s:
+  - 0.3
+  - 2.0
+  dropback_quantiles: 5
+  min_plays:
+    dl_rush: 20
+    ol_pass_block: 50
+    wrte_route: 30
+  primary_metric:
+    DL: proe
+    OL: ppoe
+    WRTE: soe
 cv:
   outer_splits: 2
   outer_repeats: 1
@@ -100,6 +124,28 @@ regression:
   - all_positions
   - defensive_line
   target: sbi
+  onfield_tasks:
+  - name: dl_getoff
+    positions:
+    - DL
+    target: goe_eb
+    label: DL get-off over expected (s)
+  - name: dl_pressure
+    positions:
+    - DL
+    target: proe_eb
+    label: DL pressure rate over expected
+  - name: ol_protection
+    positions:
+    - OL
+    target: ppoe_eb
+    label: OL pressure probability over expected
+  - name: wrte_separation
+    positions:
+    - WR
+    - TE
+    target: soe_eb
+    label: WR/TE separation over expected (yd)
   grids:
     ridge:
       model__alpha:
@@ -130,6 +176,8 @@ regression:
       - 1.0
 classification:
   target: is_starter
+  projector_alpha: 10.0
+  projector_inner_folds: 5
   scoring: roc_auc
   decision_threshold: 0.5
   grids:

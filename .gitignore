@@ -16,3 +16,4 @@ mlflow_smoke.db
 mlartifacts_smoke/
 reports/smoke/
 logs/
+data/smoke/

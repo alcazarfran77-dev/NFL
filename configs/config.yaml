@@ -23,6 +23,7 @@ raw_files:
   tracking:
     - game_tracking_2024_2.csv
     - game_tracking_2025_2.csv
+  player_play: player_play_3.csv     # added in v2.0.0: per-player play outcomes, 2023-2025
 
 mlflow:
   tracking_uri: sqlite:///mlflow.db
@@ -30,6 +31,7 @@ mlflow:
   experiment: cgmt-combine-translation
   register_models: true
   regressor_name: cgmt-snap-burst-regressor        # suffix -dl for the defensive-line model
+  onfield_regressor_prefix: cgmt-onfield            # + "-<task name>" for the on-field targets
   classifier_name: cgmt-starter-classifier
 
 business_rules:
@@ -73,6 +75,25 @@ tracking_rules:
   sbi_center: 50                   # Snap Burst Index scale: 50 + 10 * z
   sbi_scale: 10
 
+performance_rules:                 # v2.0.0: on-field performance from player_play
+  season_types: [REG]              # the challenge asks about regular-season performance
+  exclude_nullified: true          # plays wiped out by penalty are not football that counted
+  families:                        # Combine position -> on-field family with a measurable outcome
+    DL: DL
+    OL: OL
+    WR: WRTE
+    TE: WRTE
+  get_off_valid_s: [0.30, 2.00]    # NGS get-off outside this range = tracking artefact (0.006% of rush snaps)
+  dropback_quantiles: 5            # OL expectation: alignment x dropback-duration quintile
+  min_plays:                       # minimum qualifying plays for a player-level metric
+    dl_rush: 20
+    ol_pass_block: 50
+    wrte_route: 30
+  primary_metric:                  # one on-field index per family (used by the classifiers)
+    DL: proe
+    OL: ppoe
+    WRTE: soe
+
 cv:
   outer_splits: 5
   outer_repeats: 3
@@ -82,6 +103,11 @@ cv:
 regression:
   populations: [all_positions, defensive_line]   # defensive_line = where snap burst is a reliable trait
   target: sbi                      # Snap Burst Index: within-position z of shrunk 2-s burst (50 +/- 10)
+  onfield_tasks:                   # v2.0.0: Combine -> on-field performance (shrunk, over expected)
+    - {name: dl_getoff, positions: [DL], target: goe_eb, label: "DL get-off over expected (s)"}
+    - {name: dl_pressure, positions: [DL], target: proe_eb, label: "DL pressure rate over expected"}
+    - {name: ol_protection, positions: [OL], target: ppoe_eb, label: "OL pressure probability over expected"}
+    - {name: wrte_separation, positions: [WR, TE], target: soe_eb, label: "WR/TE separation over expected (yd)"}
   grids:
     ridge:
       model__alpha: [1.0, 10.0, 100.0, 300.0, 1000.0]
@@ -101,6 +127,8 @@ regression:
 
 classification:
   target: is_starter
+  projector_alpha: 10.0            # Ridge penalty of the stacked Combine -> on-field projector
+  projector_inner_folds: 5         # out-of-fold projections for training rows
   scoring: roc_auc
   decision_threshold: 0.5
   grids:
