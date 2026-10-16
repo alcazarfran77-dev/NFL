@@ -1,0 +1,12 @@
+# Pinned for reproducibility (Python 3.13). Update together with CHANGELOG.md.
+numpy==2.5.3
+pandas==3.0.5
+pyarrow==25.0.1
+scipy==1.18.1
+scikit-learn==1.9.1
+xgboost==3.4.1
+statsmodels==0.15.0
+matplotlib==3.11.2
+mlflow==3.17.1
+PyYAML==6.0.3
+pytest==9.1.1

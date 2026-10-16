@@ -1,0 +1,14 @@
+# Raw data is versioned by content hash in data/manifest.json, not by git.
+data/raw/*.csv
+data/interim/
+data/processed/
+# MLflow backend and artifacts (shipped separately in the release archive)
+mlflow.db
+mlartifacts/
+mlruns/
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.venv/

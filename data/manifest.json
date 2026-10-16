@@ -1,0 +1,36 @@
+{
+  "created_utc": "2026-10-16T03:59:59+00:00",
+  "data_version": "263d3909c68b",
+  "files": {
+    "combine_results.csv": {
+      "sha256": "e4773ef68167d508f3916d446cd411dfd77a87e5765d3babcb986201fb143b86",
+      "bytes": 41020,
+      "rows": 510
+    },
+    "players.csv": {
+      "sha256": "2cd7e0309e7aa40533028dc537c2c877dbedbe0fdb14f337fc18af31a5861c12",
+      "bytes": 47301,
+      "rows": 510
+    },
+    "player_career_successes.csv": {
+      "sha256": "0d4b8975debda4e2481218f30a16429dad5b806ecdd2fc4367291ac1460ed0a9",
+      "bytes": 13801,
+      "rows": 510
+    },
+    "games.csv": {
+      "sha256": "ca33543f6939af4ee393c568c60920c476ba91ddbfbdce5a06578b9492fa11fd",
+      "bytes": 43174,
+      "rows": 1002
+    },
+    "game_tracking_2024_2.csv": {
+      "sha256": "63b2cc1f055f20a469421c7099b6696c685d3463ded89b675be4c9d0d9464808",
+      "bytes": 8665108,
+      "rows": 96842
+    },
+    "game_tracking_2025_2.csv": {
+      "sha256": "100bba5457fcf735d019d0f71c636d0a48820336af4cd5a7fa69ea1a76f1bc98",
+      "bytes": 8688675,
+      "rows": 97147
+    }
+  }
+}

@@ -1,0 +1,121 @@
+# CGMT — Combine-to-Game Movement Translation
+# Single source of truth for paths, business rules, CV scheme and search grids.
+# Any change here must be recorded in CHANGELOG.md and bumps the pipeline version.
+
+project: cgmt
+seed: 42
+
+paths:
+  raw: data/raw
+  interim: data/interim
+  processed: data/processed
+  manifest: data/manifest.json
+  reports: reports
+  figures: reports/figures
+  metrics: reports/metrics
+  models: models
+
+raw_files:
+  combine: combine_results.csv
+  players: players.csv
+  careers: player_career_successes.csv
+  games: games.csv
+  tracking:
+    - game_tracking_2024_2.csv
+    - game_tracking_2025_2.csv
+
+mlflow:
+  tracking_uri: sqlite:///mlflow.db
+  artifact_location: mlartifacts
+  experiment: cgmt-combine-translation
+  register_models: true
+  regressor_name: cgmt-snap-burst-regressor
+  classifier_name: cgmt-starter-classifier
+
+business_rules:
+  last_completed_season: 2025      # careers table covers seasons through 2025
+  games_per_season: 17
+  starter_threshold: 0.5           # started >= 50% of available regular-season games
+  undrafted_pick: 260              # beyond the last observed pick (257)
+  draft_reference_month_day: "04-27"   # approximate draft weekend, for age at draft
+  power_conferences:
+    - Southeastern Conference
+    - Big Ten Conference
+    - Atlantic Coast Conference
+    - Big Twelve Conference
+    - Pacific Twelve Conference
+  drill_valid_ranges:              # values outside become NaN (measurement error)
+    combine_height: [64, 84]
+    combine_weight: [140, 400]
+    hand_size: [7, 12]
+    arm_length: [27, 38]
+    wing_span: [66, 90]
+    ten_yd_split: [1.30, 2.20]
+    forty: [4.10, 6.00]
+    vertical: [15, 50]
+    broad_jump: [70, 150]
+    three_cone: [6.20, 9.00]
+    short_shuttle: [3.70, 5.60]
+    bench_reps: [0, 50]
+
+tracking_rules:
+  frame_rate_hz: 10
+  snap_events: [ball_snap, snap_direct]
+  min_post_snap_frames: 20         # need a full 2.0 s after the snap
+  burst_horizon_s: 2.0             # primary metric: distance covered by t = 2.0 s
+  get_off_horizon_s: 1.0
+  cut_window_s: 0.5
+  cut_min_speed: 2.0               # yd/s at both ends of the cut window
+  speed_cap: 12.5                  # yd/s (~25.6 mph); above = sensor glitch
+  accel_cap: 15.0                  # yd/s^2
+  min_plays_per_player: 3
+  capacity_quantile: 0.80          # sensitivity only: biased low for few plays (see CHANGELOG 0.4.0)
+  sbi_center: 50                   # Snap Burst Index scale: 50 + 10 * z
+  sbi_scale: 10
+
+cv:
+  outer_splits: 5
+  outer_repeats: 3
+  inner_splits: 3
+  bootstrap_resamples: 2000
+
+regression:
+  target: burst_2s_eb              # shrunk 2-second post-snap burst capacity (yd)
+  grids:
+    ridge:
+      model__alpha: [0.1, 1.0, 10.0, 100.0]
+    random_forest:
+      model__n_estimators: [300]
+      model__max_depth: [3, 6, null]
+      model__min_samples_leaf: [3, 10]
+      model__max_features: [0.33, 1.0]
+    xgboost:
+      model__n_estimators: [200, 400]
+      model__max_depth: [2, 3]
+      model__learning_rate: [0.03, 0.1]
+      model__subsample: [0.8]
+      model__colsample_bytree: [0.8]
+      model__min_child_weight: [3, 8]
+      model__reg_lambda: [1.0]
+
+classification:
+  target: is_starter
+  scoring: roc_auc
+  decision_threshold: 0.5
+  grids:
+    logistic_regression:
+      model__C: [0.01, 0.1, 1.0, 10.0]
+      model__l1_ratio: [0.0, 1.0]     # 0 = ridge (L2), 1 = lasso (L1)
+    random_forest:
+      model__n_estimators: [300]
+      model__max_depth: [3, 6, null]
+      model__min_samples_leaf: [3, 10]
+      model__max_features: [0.33, 1.0]
+    xgboost:
+      model__n_estimators: [200, 400]
+      model__max_depth: [2, 3]
+      model__learning_rate: [0.03, 0.1]
+      model__subsample: [0.8]
+      model__colsample_bytree: [0.8]
+      model__min_child_weight: [3, 8]
+      model__reg_lambda: [1.0]
