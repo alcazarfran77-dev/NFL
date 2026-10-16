@@ -30,13 +30,13 @@
     }
   },
   "all_prospects/combine_draft_ct": {
-    "statistic": 1.5999999999999943,
-    "p_value": 0.4493289641172228,
+    "statistic": 0.14285714285713474,
+    "p_value": 0.9310627797040265,
     "rank_1_is": "best",
     "mean_ranks": {
-      "logistic_regression": 2.1333333333333333,
-      "random_forest": 1.7333333333333334,
-      "xgboost": 2.1333333333333333
+      "logistic_regression": 2.066666666666667,
+      "random_forest": 2.0,
+      "xgboost": 1.9333333333333333
     }
   },
   "tracked_subset/combine_draft": {

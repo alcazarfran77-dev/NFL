@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from scipy import stats
 from sklearn.metrics import roc_auc_score
 
@@ -39,3 +40,13 @@ def test_bootstrap_ci_brackets_estimate():
     pred = y + rng.normal(0, 0.5, 200)
     est, lo, hi = bootstrap_ci(y, pred, lambda a, b: float(np.sqrt(np.mean((a - b) ** 2))), 300, seed=3)
     assert lo <= est <= hi
+
+
+def test_partial_spearman_removes_a_shared_cause():
+    from cgmt.stats import partial_spearman
+    rng = np.random.default_rng(3)
+    c = rng.normal(size=300)
+    df = pd.DataFrame({"x": c + rng.normal(0, 0.3, 300), "y": c + rng.normal(0, 0.3, 300), "c": c})
+    raw = partial_spearman(df, "x", "y", [])
+    part = partial_spearman(df, "x", "y", ["c"])
+    assert raw["rho"] > 0.7 and abs(part["rho"]) < 0.15 and part["n"] == 300

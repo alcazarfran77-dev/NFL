@@ -38,7 +38,7 @@ from .movement import METRICS, clean_tracking, estimator_bias, metric_reliabilit
 from .performance import (ONFIELD_METRICS, clean_player_play, context_adjusted_burst, family_plays,
                           player_onfield, reliability_table, rookie_stability)
 from .stats import (bootstrap_ci, delong_test, friedman, mediation_bootstrap, pairwise_model_tests,
-                    within_group_spearman)
+                    partial_spearman, within_group_spearman)
 
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -361,6 +361,15 @@ def stage_combine_tracking_translation(cfg: Config, d: dict) -> dict:
         om["x_oriented"] = om["x"].isin(combine_tracking.CT_LOWER_IS_BETTER)
         _save(om, cfg, "ct_onfield_translation_matrix.csv", key="metrics")
         out["onfield_matrix"] = om
+        # Does a drill-tracking feature add to the official 40 for DL get-off? (rank partial correlations)
+        dl = on[on.combine_position.astype(str) == "DL"].assign(role=lambda t: _role(t["nfl_position"]).eq("interior").astype(int))
+        rows = []
+        for x in xs:
+            for label, ctrl in (("none", []), ("weight + role", ["combine_weight", "role"]),
+                                ("weight + role + official 40", ["combine_weight", "role", "forty"])):
+                r = partial_spearman(dl, x, "goe_eb", ctrl)
+                rows.append({"x": x, "y": "goe_eb", "controls": label, **r})
+        _save(pd.DataFrame(rows), cfg, "ct_partial_dl_getoff.csv", key="metrics")
     return out
 
 

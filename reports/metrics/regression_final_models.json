@@ -69,31 +69,31 @@
     "registered_as": "cgmt-onfield-wrte-separation"
   },
   "defensive_line_ct": {
-    "model": "random_forest",
+    "model": "xgboost",
     "params": {
+      "model__colsample_bytree": 0.8,
+      "model__learning_rate": 0.03,
       "model__max_depth": 3,
-      "model__max_features": 0.33,
-      "model__min_samples_leaf": 3,
-      "model__n_estimators": 200
+      "model__min_child_weight": 3,
+      "model__n_estimators": 400,
+      "model__reg_lambda": 1.0,
+      "model__subsample": 0.8
     },
-    "inner_rmse": 8.715060083733137,
+    "inner_rmse": 8.812152278183314,
     "target": "sbi",
     "registered_as": "cgmt-snap-burst-regressor-dl-ct",
     "feature_set": "athletic_ct",
     "alias": "challenger"
   },
   "dl_getoff_ct": {
-    "model": "xgboost",
+    "model": "random_forest",
     "params": {
-      "model__colsample_bytree": 0.8,
-      "model__learning_rate": 0.03,
-      "model__max_depth": 2,
-      "model__min_child_weight": 8,
-      "model__n_estimators": 200,
-      "model__reg_lambda": 1.0,
-      "model__subsample": 0.8
+      "model__max_depth": 3,
+      "model__max_features": 0.66,
+      "model__min_samples_leaf": 3,
+      "model__n_estimators": 200
     },
-    "inner_rmse": 0.056653179151221075,
+    "inner_rmse": 0.058977103006847956,
     "target": "goe_eb",
     "registered_as": "cgmt-onfield-dl-getoff-ct",
     "feature_set": "athletic_ct",
@@ -107,7 +107,7 @@
       "model__min_samples_leaf": 3,
       "model__n_estimators": 200
     },
-    "inner_rmse": 0.011632320924579647,
+    "inner_rmse": 0.011631542405530496,
     "target": "proe_eb",
     "registered_as": "cgmt-onfield-dl-pressure-ct",
     "feature_set": "athletic_ct",
@@ -135,7 +135,7 @@
       "model__min_samples_leaf": 3,
       "model__n_estimators": 200
     },
-    "inner_rmse": 0.1731889385396196,
+    "inner_rmse": 0.17300043238086388,
     "target": "soe_eb",
     "registered_as": "cgmt-onfield-wrte-separation-ct",
     "feature_set": "athletic_ct",

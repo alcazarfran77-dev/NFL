@@ -9,6 +9,7 @@
 - delong_test                DeLong (1988) test for two correlated ROC-AUCs.
 - within_group_spearman      drill-vs-game association net of position group,
                              bootstrap CI + Benjamini-Hochberg q-values.
+- partial_spearman           rank correlation of x and y after removing linear effects of controls (v2.2.0).
 """
 from __future__ import annotations
 
@@ -193,3 +194,20 @@ def within_group_spearman(df: pd.DataFrame, xs: list[str], ys: list[str], group:
         q[np.isfinite(p)] = stats.false_discovery_control(p[np.isfinite(p)], method="bh")
     out["q_value"] = q
     return out
+
+
+def partial_spearman(df: pd.DataFrame, x: str, y: str, controls: list[str]) -> dict:
+    """Spearman partial correlation: Pearson r of rank residuals after regressing out the control ranks."""
+    d = df[[x, y, *controls]].dropna()
+    if len(d) < len(controls) + 10:
+        return {"n": len(d), "rho": np.nan, "p_value": np.nan}
+    r = d.rank()
+    design = np.column_stack([np.ones(len(r)), r[controls].to_numpy()])
+
+    def resid(v):
+        return v - design @ np.linalg.lstsq(design, v, rcond=None)[0]
+
+    rho, _ = stats.pearsonr(resid(r[x].to_numpy()), resid(r[y].to_numpy()))
+    dof = len(d) - 2 - len(controls)
+    t = rho * np.sqrt(dof / max(1 - rho ** 2, 1e-12))
+    return {"n": len(d), "rho": float(rho), "p_value": float(2 * stats.t.sf(abs(t), dof))}

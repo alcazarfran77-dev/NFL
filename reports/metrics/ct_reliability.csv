@@ -20,8 +20,8 @@ shuttle,peak_accel,test-retest (attempts 1 vs 2),40,0.30628407619464665,,False,b
 shuttle,peak_decel,test-retest (attempts 1 vs 2),40,0.34918129688317207,,False,below the reliability gate
 shuttle,plant_speed_ratio,test-retest (attempts 1 vs 2),40,0.5422856530828226,ct_shuttle_plant_speed_ratio,True,
 shuttle,max_cut_deg,test-retest (attempts 1 vs 2),40,0.34380860219951975,,False,below the reliability gate
-skill,top_speed,"split-half, Spearman-Brown",510,0.7843180841841753,ct_skill_speed_z,True,
-skill,peak_accel,"split-half, Spearman-Brown",510,0.5486757328788193,ct_skill_accel_z,True,
-skill,peak_decel,"split-half, Spearman-Brown",510,0.32031273105019975,,False,below the reliability gate
-skill,max_cut_deg,"split-half, Spearman-Brown",510,0.287534966781636,,False,below the reliability gate
-skill,burst_1s,"split-half, Spearman-Brown",510,0.3087837053731765,,False,below the reliability gate
+skill,top_speed,"split-half, Spearman-Brown",510,0.7856658438000508,ct_skill_speed_z,True,
+skill,peak_accel,"split-half, Spearman-Brown",510,0.5454795600248556,ct_skill_accel_z,True,
+skill,peak_decel,"split-half, Spearman-Brown",510,0.3199589455636856,,False,below the reliability gate
+skill,max_cut_deg,"split-half, Spearman-Brown",510,0.2880275102403317,,False,below the reliability gate
+skill,burst_1s,"split-half, Spearman-Brown",510,0.2977120505534334,,False,below the reliability gate

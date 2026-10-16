@@ -21,6 +21,9 @@ MINOR: the spec's Combine drill tracking arrives as `combine_tracking_6.csv` and
 v2.0.0 number in `reports/metrics/` reproduces exactly: the same rows of the summary, fold, test, DeLong and
 importance tables, and the same registered champions. Drill tracking adds new rows and files only.
 
+**Result: drill tracking does not improve any model.** It reproduces the stopwatch, and its strongest
+link to the game (position-drill top speed with DL get-off) is explained by weight, role and the official 40.
+
 ### Added
 - **`combine_tracking_6.csv`** (spec File 3): 463,189 frames, 6,310 drill attempts and all 510 prospects, as
   the spec states. The contract now runs 370 checks with 0 errors and 26 warnings. The missing-file warning is
@@ -30,32 +33,35 @@ importance tables, and the same registered champions. Drill tracking adds new ro
   figure 19). The start of a tracked attempt does not repeat between a player's two 40s (0-5 yd r = 0.16, 10-yd
   split timed from the first frame 0.23), so start-timed metrics were dropped. A metric becomes a feature only
   if it repeats at r >= 0.5 (`combine_tracking_rules.min_reliability`), with one feature per construct. That
-  gives five features:
-  40 5-10 yd split (0.87), 40 top speed (0.99), speed kept through the shuttle turns (0.54), and position-drill
-  top speed (0.78) and acceleration (0.55), both z-scored within each drill name. The 40 features reproduce the
-  stopwatch (top speed vs official 40: rho -0.97). Position-drill speed is mostly new information (rho -0.18
-  with the 40).
-- Translation (`ct_official_validity.csv`, `ct_translation_matrix.csv`, `ct_onfield_translation_matrix.csv`,
-  figure 21). Position-drill top speed is the only drill-tracking feature linked to season-long DL get-off
-  after FDR correction (rho +0.38, q = 0.006, 88 DL). The tracked 40 features reach rho +0.32 to +0.33
-  (q = 0.056).
+  gives five features: 40 5-10 yd split (0.87), 40 top speed (0.99), speed kept through the shuttle turns (0.54),
+  and position-drill top speed (0.79) and acceleration (0.55). Both position-drill features are z-scored
+  within each drill as run by one position group.
+- Validity and translation (`ct_official_validity.csv`, `ct_translation_matrix.csv`,
+  `ct_onfield_translation_matrix.csv`, `ct_partial_dl_getoff.csv`, figure 21):
+  - The tracked 40 reproduces the stopwatch: top speed vs official 40 rho -0.97 (-0.90 within position).
+  - Position-drill top speed is the only drill-tracking feature linked to season-long DL get-off after FDR
+    correction (rho +0.37, q = 0.009, 88 DL). Within the DL it tracks the 40 closely (rho -0.76). Once weight,
+    role and the official 40 are held fixed, the partial rho falls to +0.13 (p = 0.31).
 - **Does drill tracking improve the models?** (`ct_best_vs_best.csv`, figure 20; best model in each arm, same
-  players and folds):
-  - DL get-off over expected: R² +0.096 -> +0.168 (random forest -> XGBoost; +0.072, 95% CI -0.040 to +0.183,
-    corrected t p = 0.19, better in 12 of 15 folds, Wilcoxon p = 0.008). Pooled out-of-fold R² 0.13 -> 0.23
-    [0.04, 0.37]. RMSE 0.0597 -> 0.0570 s. Position-drill top speed becomes the model's most important feature.
-  - DL snap burst, DL pressure, OL protection and WR/TE separation: no gain (R² -0.02 to -0.09, all p >= 0.35).
-  - Starter classifier: AUC 0.915 -> 0.913 (XGBoost; corrected t p = 0.59, DeLong p = 0.21). The champion stays
-    Combine + draft.
-- Registry: `<regressor>-ct@challenger` for the five game targets and
-  `cgmt-starter-classifier-combine-tracking@challenger`. Nothing is promoted, because no gain passes the
-  corrected t-test at 0.05. The DL get-off challenger is the candidate to watch.
-- `ct_best_vs_best()` runs after the models and in `--stage stats`. Figures 19-21. One new test (33 in total).
+  players and folds; corrected resampled t-test):
+  - DL get-off over expected: R² 0.096 -> 0.091 (-0.004, 95% CI -0.10 to +0.09, p = 0.92, 8 of 15 folds better).
+  - DL snap burst -0.093, DL pressure -0.037, OL protection -0.051, WR/TE separation -0.034 (all p >= 0.35).
+  - Starter classifier: AUC 0.915 -> 0.913 (XGBoost; p = 0.68; DeLong p = 0.30). The champion stays Combine + draft.
+- Registry: `<regressor>-ct@challenger` for the five game targets, and
+  `cgmt-starter-classifier-combine-tracking@challenger`. No champion changes.
+- `ct_best_vs_best()` runs after the models and in `--stage stats`. `stats.partial_spearman`. Figures 19-21.
+  Two new tests (34 in total).
 
 ### Release notes
-- Trained from a clean MLflow store: 83 runs tagged `git_commit = 5d035d1`, `pipeline_version = 2.2.0` and
-  `data_version = d63395440694`, with 15 registered models. Afterwards, `ct_best_vs_best` and figure fixes were
-  added and applied with `--stage stats` and `--stage figures`, without retraining.
+- Trained from a clean MLflow store: 83 runs tagged `git_commit = 22b147e`, `pipeline_version = 2.2.0` and
+  `data_version = d63395440694`, with 15 registered models. Afterwards, the within-position validity column,
+  the DL get-off partial correlations and figure-title fixes were added. They were applied with
+  `--stage translation`, `--stage stats` and `--stage figures`, without retraining.
+- A first release run z-scored the position drills pooled across position groups. Five drill names, such as
+  the gauntlet, are run by several groups (19% of position-drill attempts). That run showed a DL get-off gain
+  of R² +0.07 (12 of 15 folds), already not significant under the corrected t-test (p = 0.19). Correcting the
+  grouping removed the gain. Such sensitivity to a small feature change is what the conservative test
+  guards against; the corrected run is the release.
 
 ## [2.1.0] - 2026-10-16
 

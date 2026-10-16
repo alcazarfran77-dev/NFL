@@ -145,73 +145,73 @@
   },
   "defensive_line_ct": {
     "rmse": {
-      "statistic": 5.960000000000008,
-      "p_value": 0.11357261256943134,
+      "statistic": 8.360000000000014,
+      "p_value": 0.03912900551959998,
       "rank_1_is": "best",
       "mean_ranks": {
-        "position_mean": 3.2,
-        "ridge": 2.3333333333333335,
+        "position_mean": 3.3333333333333335,
+        "ridge": 2.2666666666666666,
         "random_forest": 2.2,
-        "xgboost": 2.2666666666666666
+        "xgboost": 2.2
       }
     },
     "r2": {
-      "statistic": 5.960000000000008,
-      "p_value": 0.11357261256943134,
+      "statistic": 8.360000000000014,
+      "p_value": 0.03912900551959998,
       "rank_1_is": "best",
       "mean_ranks": {
-        "position_mean": 3.2,
-        "ridge": 2.3333333333333335,
+        "position_mean": 3.3333333333333335,
+        "ridge": 2.2666666666666666,
         "random_forest": 2.2,
-        "xgboost": 2.2666666666666666
+        "xgboost": 2.2
       }
     }
   },
   "dl_getoff_ct": {
     "rmse": {
-      "statistic": 31.24000000000001,
-      "p_value": 7.566662112330335e-07,
+      "statistic": 12.200000000000017,
+      "p_value": 0.006728522930461313,
       "rank_1_is": "best",
       "mean_ranks": {
-        "position_mean": 3.7333333333333334,
-        "ridge": 3.066666666666667,
-        "random_forest": 1.5333333333333334,
-        "xgboost": 1.6666666666666667
+        "position_mean": 3.4,
+        "ridge": 2.533333333333333,
+        "random_forest": 1.8,
+        "xgboost": 2.2666666666666666
       }
     },
     "r2": {
-      "statistic": 31.24000000000001,
-      "p_value": 7.566662112330335e-07,
+      "statistic": 12.200000000000017,
+      "p_value": 0.006728522930461313,
       "rank_1_is": "best",
       "mean_ranks": {
-        "position_mean": 3.7333333333333334,
-        "ridge": 3.066666666666667,
-        "random_forest": 1.5333333333333334,
-        "xgboost": 1.6666666666666667
+        "position_mean": 3.4,
+        "ridge": 2.533333333333333,
+        "random_forest": 1.8,
+        "xgboost": 2.2666666666666666
       }
     }
   },
   "dl_pressure_ct": {
     "rmse": {
-      "statistic": 5.960000000000008,
-      "p_value": 0.11357261256943134,
+      "statistic": 5.640000000000015,
+      "p_value": 0.13050077008525304,
       "rank_1_is": "best",
       "mean_ranks": {
         "position_mean": 2.8666666666666667,
-        "ridge": 2.2,
-        "random_forest": 2.0,
-        "xgboost": 2.933333333333333
+        "ridge": 2.466666666666667,
+        "random_forest": 1.8666666666666667,
+        "xgboost": 2.8
       }
     },
     "r2": {
-      "statistic": 5.960000000000008,
-      "p_value": 0.11357261256943134,
+      "statistic": 5.640000000000015,
+      "p_value": 0.13050077008525304,
       "rank_1_is": "best",
       "mean_ranks": {
         "position_mean": 2.8666666666666667,
-        "ridge": 2.2,
-        "random_forest": 2.0,
-        "xgboost": 2.933333333333333
+        "ridge": 2.466666666666667,
+        "random_forest": 1.8666666666666667,
+        "xgboost": 2.8
       }
     }
   },
@@ -241,24 +241,24 @@
   },
   "wrte_separation_ct": {
     "rmse": {
-      "statistic": 8.680000000000007,
-      "p_value": 0.033862368415625586,
+      "statistic": 8.200000000000017,
+      "p_value": 0.042054182894965875,
       "rank_1_is": "best",
       "mean_ranks": {
         "position_mean": 3.2666666666666666,
-        "ridge": 2.2666666666666666,
-        "random_forest": 1.9333333333333333,
+        "ridge": 2.1333333333333333,
+        "random_forest": 2.066666666666667,
         "xgboost": 2.533333333333333
       }
     },
     "r2": {
-      "statistic": 8.680000000000007,
-      "p_value": 0.033862368415625586,
+      "statistic": 8.200000000000017,
+      "p_value": 0.042054182894965875,
       "rank_1_is": "best",
       "mean_ranks": {
         "position_mean": 3.2666666666666666,
-        "ridge": 2.2666666666666666,
-        "random_forest": 1.9333333333333333,
+        "ridge": 2.1333333333333333,
+        "random_forest": 2.066666666666667,
         "xgboost": 2.533333333333333
       }
     }

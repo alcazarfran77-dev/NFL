@@ -266,8 +266,12 @@ def player_features(attempts: pd.DataFrame, nfl_ids: pd.Series | None = None) ->
     return feats[CT_FEATURES + ["ct_attempts", "ct_missing"]].reset_index()
 
 
-def official_vs_tracking(features: pd.DataFrame, prospects: pd.DataFrame) -> pd.DataFrame:
-    """Convergent validity: does the tracking reproduce the official stopwatch? (Spearman, Pearson)."""
+def official_vs_tracking(features: pd.DataFrame, prospects: pd.DataFrame, group: str = "combine_position") -> pd.DataFrame:
+    """Convergent validity: does the tracking reproduce the official stopwatch?
+
+    `spearman` / `pearson` pool all prospects; `within_position_spearman` removes position-group means first
+    (as every translation table does), which is the comparison that matters for a within-position model.
+    """
     pairs = [("ct_forty_split_5_10_s", "ten_yd_split"), ("ct_forty_split_5_10_s", "forty"),
              ("ct_forty_top_speed", "forty"), ("ct_forty_top_speed", "ten_yd_split"),
              ("ct_shuttle_plant_speed_ratio", "short_shuttle"), ("ct_skill_speed_z", "forty"),
@@ -278,13 +282,16 @@ def official_vs_tracking(features: pd.DataFrame, prospects: pd.DataFrame) -> pd.
     for ct_col, off in pairs:
         if ct_col not in df or off not in df:
             continue
-        t = df[[ct_col, off]].dropna()
+        t = df[[ct_col, off, group]].dropna()
         if len(t) < 10:
             continue
         rho, p = stats.spearmanr(t[ct_col], t[off])
         r, _ = stats.pearsonr(t[ct_col], t[off])
+        g = t.groupby(t[group].astype(str))
+        w = t[[ct_col, off]] - g[[ct_col, off]].transform("mean")
+        rho_w, p_w = stats.spearmanr(w[ct_col], w[off])
         rows.append({"tracking_feature": ct_col, "official_result": off, "n": len(t), "spearman": rho,
-                     "pearson": r, "p_value": p})
+                     "pearson": r, "p_value": p, "within_position_spearman": rho_w, "within_position_p": p_w})
     return pd.DataFrame(rows)
 
 

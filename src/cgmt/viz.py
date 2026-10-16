@@ -742,12 +742,16 @@ def fig_ct_value(cfg, m_dir, clf_tests, n_folds):
         ax.grid(axis="y", visible=False)
     up = [names[r.task] for r in bvb[bvb.kind == "regression"].itertuples() if r.task in names and r.r2_p_corrected_t < 0.05 and r.r2_diff > 0]
     best_up = r1.sort_values("d").iloc[-1]
+    cbest = r2.iloc[-1]
     if up:
-        head = f"Drill tracking improves {', '.join(up)}"
-    else:
+        head = f"Drill tracking improves {', '.join(up)}; nothing else improves"
+    elif best_up.d > 0.01:
         head = (f"Drill tracking lifts {best_up.label.split(chr(10))[0].replace(' over expected', '')} R² "
-                f"{best_up.base:+.2f} -> {best_up.new:+.2f} ({int(best_up.wins)}/{n_folds} folds, p = {best_up.p:.2f})")
-    _title(fig, f"{head}; nothing else improves",
+                f"{best_up.base:+.2f} -> {best_up.new:+.2f} ({int(best_up.wins)}/{n_folds} folds, p = {best_up.p:.2f}); nothing else improves")
+    else:
+        head = (f"Drill tracking improves no model: R² change {r1.d.min():+.3f} to {r1.d.max():+.3f}, "
+                f"starter AUC {cbest.d:+.3f}")
+    _title(fig, head,
            f"Same players and folds with and without the 5 drill-tracking features; mean over {n_folds} outer folds, "
            "95% CI from the corrected resampled t-test; blue = significant gain")
     _save(fig, cfg, "fig20_ct_value.png", "nested CV fold scores: ct_best_vs_best.csv, classification_pairwise_tests.csv")

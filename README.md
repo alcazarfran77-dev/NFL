@@ -40,13 +40,13 @@ Against the files delivered: **0 errors, 26 warnings** (370 checks). What differ
 1. **The start of a tracked drill is not repeatable; distance splits are.** Across a player's two 40s the
    0-5 yd split repeats at r = 0.16, the 5-10 yd split at 0.87 and top speed at 0.99. Features are gated at
    r >= 0.5, one per construct: 40 acceleration (5-10 yd), 40 top speed, speed kept through the shuttle turns,
-   and position-drill top speed and acceleration (z-scored within each drill).
-2. **Position-drill top speed is new information that predicts DL get-off.** It is nearly independent of the
-   40 (rho -0.18), and it correlates +0.38 with season-long get-off over expected (q = 0.006).
-3. **It lifts the DL get-off model, and nothing else.** R² rises from 0.10 to 0.17 (better in 12 of 15 folds,
-   Wilcoxon p = 0.008, corrected t p = 0.19); pooled out-of-fold R² from 0.13 to 0.23. There is no gain for snap
-   burst, pressure, OL protection, separation or the starter model (AUC 0.915 -> 0.913). Champions are unchanged;
-   the drill-tracking models are registered as challengers.
+   and position-drill top speed and acceleration (z-scored within each drill as run by one position group).
+2. **The tracking reproduces the stopwatch.** Tracked 40 top speed vs official 40: rho -0.97.
+3. **It improves no model.** Position-drill top speed correlates +0.37 with DL get-off (q = 0.009). Within
+   the DL it tracks the 40 (rho -0.76), and with weight, role and the 40 held fixed the link falls to +0.13
+   (p = 0.31). Same folds with and without drill tracking: R² change -0.004 for DL get-off and -0.03 to -0.09
+   elsewhere. Starter AUC is 0.915 -> 0.913 (DeLong p = 0.30). Champions are unchanged; the drill-tracking
+   models are registered as challengers.
 
 ## Headline findings (v2.0)
 
@@ -105,7 +105,7 @@ src/cgmt/
   mlops.py                 MLflow tracking, tags, model registry
   viz.py                   21 report figures
   pipeline.py              CLI orchestrator
-tests/                     33 pytest tests
+tests/                     34 pytest tests
 reports/metrics/           every table behind the report (CSV/JSON)
 reports/figures/           fig01 ... fig21
 mlflow.db, mlartifacts/    experiment store and model registry (in the release archive)
@@ -117,7 +117,7 @@ mlflow.db, mlartifacts/    experiment store and model registry (in the release a
 python -m pip install -r requirements.txt     # Python 3.13, pinned versions
 make relocate                                 # once, after extracting the archive (repoints MLflow paths)
 make validate                                 # data contract only, ~10 s
-make test                                     # 33 unit tests, ~5 s
+make test                                     # 34 unit tests, ~5 s
 make smoke                                    # whole pipeline on tiny grids, ~5 min (own output folders)
 make all                                      # release run, ~60 min on 2 cores
 make ui                                       # MLflow UI: runs + registry

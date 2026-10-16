@@ -1,0 +1,16 @@
+x,y,controls,n,rho,p_value
+ct_forty_split_5_10_s,goe_eb,none,70,0.3213542122299011,0.006676065391666628
+ct_forty_split_5_10_s,goe_eb,weight + role,70,0.15991823980492614,0.19268659038141253
+ct_forty_split_5_10_s,goe_eb,weight + role + official 40,70,-0.037238560707874666,0.7648039953091167
+ct_forty_top_speed,goe_eb,none,70,0.3285305619105848,0.005491113821699291
+ct_forty_top_speed,goe_eb,weight + role,70,0.18958481588014883,0.12151353826145429
+ct_forty_top_speed,goe_eb,weight + role + official 40,70,-0.18734871900761937,0.12898076755887938
+ct_shuttle_plant_speed_ratio,goe_eb,none,28,0.06677613574165302,0.7356545295452075
+ct_shuttle_plant_speed_ratio,goe_eb,weight + role,28,0.0644724225054643,0.7543538212856277
+ct_shuttle_plant_speed_ratio,goe_eb,weight + role + official 40,25,0.16108395120833338,0.47390153890702186
+ct_skill_speed_z,goe_eb,none,88,0.3725300271212709,0.0003512519003096004
+ct_skill_speed_z,goe_eb,weight + role,88,0.23091860727215974,0.03242624205353206
+ct_skill_speed_z,goe_eb,weight + role + official 40,71,0.1254428821095586,0.30806838332753805
+ct_skill_accel_z,goe_eb,none,88,0.22843506745095277,0.03230132239857697
+ct_skill_accel_z,goe_eb,weight + role,88,0.024185527802216496,0.8250631043176724
+ct_skill_accel_z,goe_eb,weight + role + official 40,71,0.0022213051002267508,0.985656590617768

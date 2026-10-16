@@ -21,9 +21,9 @@ The raw files are checked against the provider's data structure spec on every ru
 | `cgmt-onfield-dl-pressure@champion` (v2.0) | DL pressure rate over expected | 89 DL | Random forest | 200 trees, depth 6, max features 0.33, min leaf 3 | No better than baseline (pooled R^2 0.05 [-0.13, 0.17]) |
 | `cgmt-onfield-ol-protection@champion` (v2.0) | OL pressure probability over expected | 70 OL | Random forest | 200 trees, depth 3, max features 0.33, min leaf 10 | No better than baseline (pooled R^2 -0.01) |
 | `cgmt-onfield-wrte-separation@champion` (v2.0) | WR/TE separation over expected (yd) | 96 WR/TE | Ridge | alpha = 100 | RMSE 0.169 vs 0.186 baseline; pooled R^2 0.19 [-0.01, 0.30] |
-| `cgmt-onfield-dl-getoff-ct@challenger` (v2.2) | DL get-off over expected (s) | 88 DL, + drill tracking | XGBoost | 200 trees, depth 2, lr 0.03, min child weight 8 | RMSE 0.057 vs 0.060 without tracking; pooled R^2 0.23 [0.04, 0.37]; better in 12 of 15 folds (corrected t p = 0.19) |
-| `cgmt-starter-classifier-combine-tracking@challenger` (v2.2) | P(starter) | 510 prospects, Combine + draft + drill tracking | XGBoost | 200 trees, depth 2, lr 0.03, min child weight 3 | ROC-AUC 0.913 vs 0.915 without tracking (DeLong p = 0.21) |
-| `cgmt-snap-burst-regressor-dl-ct`, `cgmt-onfield-{dl-pressure,ol-protection,wrte-separation}-ct` @challenger (v2.2) | as their champions | + drill tracking | best of the four per task | see `regression_final_models.json` | No gain over the champion (R^2 change -0.02 to -0.09) |
+| `cgmt-onfield-dl-getoff-ct@challenger` (v2.2) | DL get-off over expected (s) | 88 DL, + drill tracking | Random forest | 200 trees, depth 3, max features 0.66, min leaf 3 | RMSE 0.060, same as without tracking; R^2 change -0.004 (p = 0.92) |
+| `cgmt-starter-classifier-combine-tracking@challenger` (v2.2) | P(starter) | 510 prospects, Combine + draft + drill tracking | XGBoost | 200 trees, depth 2, lr 0.03, min child weight 3 | ROC-AUC 0.913 vs 0.915 without tracking (DeLong p = 0.30) |
+| `cgmt-snap-burst-regressor-dl-ct`, `cgmt-onfield-{dl-pressure,ol-protection,wrte-separation}-ct` @challenger (v2.2) | as their champions | + drill tracking | best of the four per task | see `regression_final_models.json` | No gain over the champion (R^2 change -0.03 to -0.09) |
 
 Input: a pandas DataFrame with `combine_position` plus the feature columns of the
 chosen feature set (`cgmt.features.FEATURE_SETS`); the logged signature and input
@@ -38,9 +38,8 @@ example define the exact schema. Missing drills are allowed (imputed in-pipeline
 - **On-field regressors (v2.0):** project a prospect's season-long on-field performance from his
   Combine profile; useful for DL get-off and WR/TE separation only. The DL-pressure and
   OL-protection models are registered for completeness and do not beat the position mean.
-- **Drill-tracking challengers (v2.2):** the DL get-off challenger is the one candidate for promotion. It is
-  better in 12 of 15 folds, but the gain is not significant under the corrected resampled t-test, which is the
-  bar for replacing a champion. It needs the five `ct_*` features from `cgmt.combine_tracking` at inference.
+- **Drill-tracking challengers (v2.2):** registered so the comparison is reproducible; none beats its
+  champion. They need the five `ct_*` features from `cgmt.combine_tracking` at inference.
 - **Not intended:** ranking WRs or DBs by snap burst (the metric is not a stable trait for
   them in this data); any use of the movement or on-field challengers for draft decisions
   (their features exist only after the draft).
