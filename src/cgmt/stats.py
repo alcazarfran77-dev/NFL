@@ -63,12 +63,13 @@ def pairwise_model_tests(scores: pd.DataFrame, metric: str, n_train: int, n_test
     return out
 
 
-def friedman(scores: pd.DataFrame) -> dict:
+def friedman(scores: pd.DataFrame, higher_is_better: bool = True) -> dict:
+    """Friedman test across models on the same folds; mean_ranks: 1 = best in each fold."""
     if scores.shape[1] < 3:
         return {"statistic": np.nan, "p_value": np.nan, "mean_ranks": {}}
     res = stats.friedmanchisquare(*[scores[c].to_numpy() for c in scores.columns])
-    ranks = scores.rank(axis=1, ascending=False).mean().to_dict()
-    return {"statistic": float(res.statistic), "p_value": float(res.pvalue), "mean_ranks": ranks}
+    ranks = scores.rank(axis=1, ascending=not higher_is_better).mean().to_dict()
+    return {"statistic": float(res.statistic), "p_value": float(res.pvalue), "rank_1_is": "best", "mean_ranks": ranks}
 
 
 def bootstrap_ci(y: np.ndarray, pred: np.ndarray, fn: Callable, n_boot: int, seed: int,

@@ -176,14 +176,16 @@ def stage_translation(cfg: Config, d: dict) -> dict:
     _save(tab, cfg, "starter_rate_by_sbi_band.csv", key="metrics")
 
     # Logistic GLM: does SBI add to position + draft capital + Combine athleticism? (LRT)
+    # `is_undrafted` is left out: no undrafted tracked player started (quasi-complete
+    # separation, the MLE does not converge); log pick already places them at pick 260.
     g = df.assign(sbi10=df["sbi"] / 10, athl10=df["ngs_athleticism_score"] / 10, pos=df["combine_position"].astype(str))
-    base = smf.logit("is_starter ~ C(pos) + log_draft_pick + is_undrafted + athl10", data=g).fit(disp=0)
-    full = smf.logit("is_starter ~ C(pos) + log_draft_pick + is_undrafted + athl10 + sbi10", data=g).fit(disp=0)
+    base = smf.logit("is_starter ~ C(pos) + log_draft_pick + athl10", data=g).fit(disp=0, maxiter=200)
+    full = smf.logit("is_starter ~ C(pos) + log_draft_pick + athl10 + sbi10", data=g).fit(disp=0, maxiter=200)
     lr = 2 * (full.llf - base.llf)
     ci = np.exp(full.conf_int().loc["sbi10"])
     ci_a = np.exp(full.conf_int().loc["athl10"])
     glm = {
-        "n": int(full.nobs), "events": int(g["is_starter"].sum()),
+        "n": int(full.nobs), "events": int(g["is_starter"].sum()), "converged": bool(full.mle_retvals["converged"]),
         "or_per_10_sbi": float(np.exp(full.params["sbi10"])), "or_sbi_ci": [float(ci.iloc[0]), float(ci.iloc[1])],
         "p_sbi_wald": float(full.pvalues["sbi10"]),
         "or_per_10_ngs_athleticism": float(np.exp(full.params["athl10"])), "or_athl_ci": [float(ci_a.iloc[0]), float(ci_a.iloc[1])],
@@ -233,7 +235,7 @@ def stage_regression(cfg: Config, d: dict) -> dict:
         tests = pd.concat([pairwise_model_tests(scores[m], m, any_res.n_train, any_res.n_test, higher_is_better=(m == "r2"))
                            for m in ["rmse", "r2"]], ignore_index=True)
         tests.insert(0, "population", pop)
-        out["friedman"][pop] = {m: friedman(scores[m]) for m in ["rmse", "r2"]}
+        out["friedman"][pop] = {m: friedman(scores[m], higher_is_better=(m == "r2")) for m in ["rmse", "r2"]}
         for m, s in scores.items():
             _save(s.reset_index(names="fold"), cfg, f"regression_fold_{pop}_{m}.csv", key="metrics")
 
@@ -388,11 +390,36 @@ def _summarise(results: dict, metrics: list[str], cfg: Config, task: str):
     return pd.DataFrame(rows), {m: pd.DataFrame(v) for m, v in scores.items()}
 
 
+# ----------------------------------------------------------------------------- stats (no retraining)
+def stage_stats(cfg: Config) -> None:
+    """Recompute the rank-based omnibus tests from saved outer-fold scores.
+
+    Lets a statistics fix be applied to a release run without retraining: the fold
+    scores are the run's own outputs, so the tests stay tied to that run.
+    """
+    m = cfg.path("metrics")
+    reg = pd.read_csv(m / "regression_summary.csv")
+    fried = {}
+    for pop in reg.population.unique():
+        fried[pop] = {}
+        for metric in ["rmse", "r2"]:
+            f = pd.read_csv(m / f"regression_fold_{pop}_{metric}.csv").drop(columns=["fold"])
+            fried[pop][metric] = friedman(f, higher_is_better=(metric == "r2"))
+    _dump(fried, cfg, "regression_friedman.json")
+    folds = pd.read_csv(m / "classification_fold_scores.csv")
+    cf = {}
+    for (pop, fs), g in folds.groupby(["population", "feature_set"], sort=False):
+        wide = g.pivot(index="fold", columns="model", values="roc_auc")
+        cf[f"{pop}/{fs}"] = friedman(wide, higher_is_better=True)
+    _dump(cf, cfg, "classification_friedman.json")
+    log.info("stats: recomputed Friedman tests from saved fold scores")
+
+
 # ----------------------------------------------------------------------------- main
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description="CGMT pipeline")
     ap.add_argument("--config", default=None)
-    ap.add_argument("--stage", default="all", choices=["all", "data", "translation", "models", "figures"])
+    ap.add_argument("--stage", default="all", choices=["all", "data", "translation", "models", "stats", "figures"])
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     cfg = load_config(args.config)
@@ -400,6 +427,9 @@ def main(argv: list[str] | None = None) -> None:
     mlops.setup(cfg)
     log.info("CGMT v%s seed=%d", __version__, cfg.seed)
 
+    if args.stage == "stats":
+        stage_stats(cfg)
+        return
     d = stage_data(cfg) if args.stage in ("all", "data") else load_processed(cfg)
     if args.stage == "data":
         return

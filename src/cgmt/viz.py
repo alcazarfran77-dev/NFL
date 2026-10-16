@@ -37,6 +37,12 @@ LABELS = {
     "max_cut_deg_eb": "Sharpest cut", "start_rate": "Start rate",
     "position_mean": "Position mean\n(baseline)", "ridge": "Ridge", "random_forest": "Random forest", "xgboost": "XGBoost",
     "logistic_regression": "Logistic reg.",
+    "ten_split_momentum": "10-yd momentum (weight / split)", "speed_score": "Speed Score", "ten_split_share": "10-yd share of the 40",
+    "ngs_college_production_score": "NGS production score", "age_at_draft": "Age at draft", "combine_position": "Position group",
+    "log_draft_pick": "Draft pick (log)", "is_undrafted": "Undrafted", "wing_span": "Wingspan", "hand_size": "Hand size",
+    "arm_length": "Arm length", "combine_height": "Height", "power_conference": "Power conference", "n_drills_run": "Drills run",
+    "sbi": "SBI", "top_speed_z": "Top speed (game)", "max_cut_deg_z": "Sharpest cut (game)", "burst_1s_z": "Distance at 1 s (game)",
+    "get_off_1s_z": "Get-off (game)", "peak_accel_2s_z": "Peak accel (game)", "max_decel_z": "Max braking (game)",
     "combine": "Combine only", "combine_draft": "Combine + draft", "combine_draft_mov": "Combine + draft\n+ game movement",
 }
 
@@ -153,30 +159,35 @@ def fig_burst_distribution(cfg, plays, anomalies):
 
 def fig_speed_traces(cfg, frames, plays, profiles, prospects):
     from .movement import speed_curves
-    pos = "DL"
-    cand = profiles[(profiles.combine_position == pos) & (profiles.n_plays >= 8)].sort_values("sbi")
-    lo, hi = cand.iloc[0], cand.iloc[-1]
+    roles = prospects.set_index("nfl_id").nfl_position.astype(str)
+    edge = profiles[(profiles.combine_position == "DL") & (profiles.n_plays >= 8)
+                    & profiles.nfl_id.map(roles).isin(["DE", "OLB"])].sort_values("sbi")
+    lo, hi = edge.iloc[0], edge.iloc[-1]
     curves = speed_curves(frames, plays, [int(lo.nfl_id), int(hi.nfl_id)], 4.0)
     names = prospects.set_index("nfl_id").display_name
     fig, ax = plt.subplots(figsize=(9, 4.6))
-    fig.subplots_adjust(left=0.08, right=0.8, top=0.82, bottom=0.12)
+    fig.subplots_adjust(left=0.08, right=0.97, top=0.82, bottom=0.12)
+    peaks = {}
     for pid, color, lab in [(int(lo.nfl_id), MUTED, "low"), (int(hi.nfl_id), ACCENT, "high")]:
         c = curves[curves.nfl_id == pid]
         for _, g in c.groupby(["game_id", "play_id"]):
             ax.plot(g.t, g.speed, color=color, alpha=0.25, linewidth=0.8)
         med = c.groupby("t").speed.median()
         ax.plot(med.index, med.values, color=color if lab == "high" else INK2, linewidth=2.2)
-        sbi = profiles.set_index("nfl_id").loc[pid, "sbi"]
-        n = profiles.set_index("nfl_id").loc[pid, "n_plays"]
-        ax.text(4.08, med.values[-1], f"{names[pid]}\nSBI {sbi:.0f} ({n} plays)", va="center", fontsize=8.5,
-                color=INK, fontweight="bold" if lab == "high" else "normal")
+        p = profiles.set_index("nfl_id").loc[pid]
+        early = med[med.index <= 2.0]
+        peaks[lab] = early.max()
+        tx = 0.75 if lab == "high" else 0.95
+        ty = early.max() + 0.35 if lab == "high" else float(med.loc[min(med.index, key=lambda t: abs(t - 1.0))]) - 0.75
+        ax.text(tx, ty, f"{names[pid]} ({roles[pid]}): SBI {p.sbi:.0f}, {int(p.n_plays)} plays",
+                fontsize=8.5, color=INK, fontweight="bold" if lab == "high" else "normal")
     ax.axvline(2.0, color=INK2, linewidth=0.9, linestyle=(0, (4, 3)))
-    ax.text(2.04, ax.get_ylim()[1] * 0.96, "SBI measured here (t = 2.0 s)", fontsize=8, color=INK2, va="top")
+    ax.text(2.04, 0.2, "SBI measured here (t = 2.0 s)", fontsize=8, color=INK2)
     ax.set_xlabel("Seconds after the snap")
     ax.set_ylabel("Speed (yd/s)")
     ax.set_xlim(0, 4)
-    _title(fig, f"Two defensive linemen, same job: one is at full speed by 2 s, the other is still building",
-           "Post-snap speed on every tracked play (thin) and the median trace (thick), highest vs lowest SBI among DL with 8+ plays")
+    _title(fig, f"Two edge rushers: one peaks at {peaks['high']:.1f} yd/s inside 2 s, the other at {peaks['low']:.1f}",
+           "Post-snap speed on every tracked play (thin) and the median trace (thick); highest vs lowest SBI among DE/OLB with 8+ plays")
     _save(fig, cfg, "fig04_speed_traces.png", "game_tracking 2024-2025")
 
 
@@ -188,7 +199,8 @@ def fig_estimator_bias(cfg, bias, sens):
     for est in ["q80", "median", "mean"]:
         b = bias[bias.estimator == est].sort_values("n_plays")
         a1.plot(b.n_plays, b.bias, marker="o", color=colors[est], linewidth=2, markersize=6)
-        a1.text(b.n_plays.iloc[-1] + 0.4, b.bias.iloc[-1], names[est], va="center", fontsize=8.5, color=INK)
+        dy = {"mean": 0.022, "median": -0.022, "q80": 0.0}[est]
+        a1.text(b.n_plays.iloc[-1] + 0.4, b.bias.iloc[-1] + dy, names[est], va="center", fontsize=8.5, color=INK)
     a1.axhline(0, color=INK2, linewidth=0.8)
     a1.set_xlim(2, 15.5)
     a1.set_xticks([3, 5, 10])
@@ -241,8 +253,7 @@ def fig_translation_matrix(cfg, matrix):
         s.set_visible(False)
     best = matrix[matrix.y == "burst_2s_eb"].sort_values("rho", ascending=False).iloc[0]
     _title(fig, "Sprint and jump drills carry into game movement; the NGS composite and bench press do not",
-           f"Within-position Spearman rho, Combine result vs in-game metric (* = FDR q < 0.05); times sign-flipped so + = better test, more movement. "
-           f"Best for snap burst: {LABELS[best.x]} ({best.rho:+.2f})")
+           f"Within-position Spearman rho, Combine result vs in-game metric (* = FDR q < 0.05). Best for snap burst: {LABELS[best.x]} ({best.rho:+.2f})")
     fig.text(0.24, 0.07, "Blue = better test goes with more game movement; orange = the reverse. Body weight is shown as measured (heavier = more).",
              fontsize=8, color=INK2)
     _save(fig, cfg, "fig07_translation_matrix.png", "combine_results + game_tracking, 221 players with 3+ plays")
@@ -318,10 +329,10 @@ def fig_dl_role(cfg, dl_tab):
     ax.set_yticks(range(len(xs)), [f"{LABELS[x]} (n={int(t.loc[('none', x), 'n'])})" for x in xs])
     ax.invert_yaxis()
     ax.set_xlabel("Spearman rho with in-game get-off (speed 1 s after the snap); times sign-flipped")
-    ax.legend(loc="lower right", fontsize=8.5)
+    ax.legend(loc="lower left", fontsize=8.5)
     raw = t.loc[("none", "ten_yd_split"), "rho"]
     adj = t.loc[("edge vs interior role", "ten_yd_split"), "rho"]
-    _title(fig, f"On the defensive line, about half the drill-to-game link is role: 10-yd split {raw:+.2f} raw, {adj:+.2f} within role",
+    _title(fig, f"On the DL, half the drill-to-game link is role: 10-yd split {raw:+.2f} raw, {adj:+.2f} within role",
            "Edge = DE/OLB, interior = DT/NT; heavier interior linemen test slower and also get off slower by assignment")
     _save(fig, cfg, "fig08_dl_translation_by_role.png", "defensive linemen with 3+ tracked plays")
 
@@ -391,19 +402,21 @@ def fig_roc(cfg, oof, summary):
     pops = [("all_prospects", ["combine", "combine_draft"], "A. All prospects"),
             ("tracked_subset", ["combine_draft", "combine_draft_mov"], "B. Players with tracking")]
     for ax, (pop, fsets, title) in zip(axes, pops):
+        models = []
         for j, fs in enumerate(fsets):
             s = summary[(summary.population == pop) & (summary.feature_set == fs)].sort_values("roc_auc_mean", ascending=False).iloc[0]
+            models.append(LABELS[s.model])
             o = oof[(oof.population == pop) & (oof.feature_set == fs) & (oof.model == s.model)]
             o = o.groupby("row").agg(y=("y", "first"), p=("pred", "mean"))
             fpr, tpr, _ = roc_curve(o.y, o.p)
             col = ACCENT if j == 1 else INK2
             ax.plot(fpr, tpr, color=col, linewidth=2,
-                    label=f"{LABELS[fs].replace(chr(10), ' ')} - {LABELS[s.model]}: AUC {s.oof_auc:.2f} [{s.oof_auc_ci_low:.2f}, {s.oof_auc_ci_high:.2f}]")
+                    label=f"{LABELS[fs].replace(chr(10), ' ')}: {s.oof_auc:.2f} [{s.oof_auc_ci_low:.2f}, {s.oof_auc_ci_high:.2f}]")
         ax.plot([0, 1], [0, 1], color=MUTED, linewidth=0.8, linestyle=(0, (4, 3)))
         ax.set_xlabel("False positive rate")
         ax.set_ylabel("True positive rate")
-        ax.set_title(title)
-        ax.legend(loc="lower right", fontsize=7.5)
+        ax.set_title(f"{title} ({' / '.join(dict.fromkeys(models))})")
+        ax.legend(loc="lower right", fontsize=7.5, title="ROC-AUC [95% CI]", title_fontsize=7.5)
     _title(fig, "Out-of-fold ROC curves of the best model per feature set",
            "Predictions averaged over the 3 CV repeats; brackets = bootstrap 95% CI (2,000 stratified resamples)")
     _save(fig, cfg, "fig12_roc_curves.png", "nested CV out-of-fold predictions")
@@ -411,9 +424,12 @@ def fig_roc(cfg, oof, summary):
 
 def fig_importance(cfg, imp_clf, imp_reg, finals, reg_champ):
     imp_reg = imp_reg[imp_reg.population == "defensive_line"]
-    fig, (a1, a2) = plt.subplots(1, 2, figsize=(11.5, 5))
-    fig.subplots_adjust(left=0.17, right=0.98, top=0.8, bottom=0.1, wspace=0.75)
-    nice = lambda f: LABELS.get(f, f).replace("\n", " ").replace("_", " ")
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(11.5, 5.2))
+    fig.subplots_adjust(left=0.18, right=0.98, top=0.8, bottom=0.15, wspace=0.75)
+    def nice(f):
+        if f.endswith("_missing"):
+            return f"{LABELS.get(f[:-8], f[:-8]).replace(chr(10), ' ')} not run"
+        return LABELS.get(f, f).replace("\n", " ").replace("_", " ")
     for ax, imp, title, unit in [(a1, imp_clf, f"A. Starter classifier ({LABELS[finals['champion']['model']]})", "drop in ROC-AUC"),
                                  (a2, imp_reg, f"B. DL snap-burst regressor ({LABELS[reg_champ]})", "rise in RMSE (SBI pts)")]:
         top = imp.head(10).iloc[::-1]
@@ -424,7 +440,7 @@ def fig_importance(cfg, imp_clf, imp_reg, finals, reg_champ):
         ax.set_title(title)
         ax.axvline(0, color=INK2, linewidth=0.8)
     _title(fig, f"Draft pick dominates who starts; {nice(imp_reg.iloc[0].feature)} leads for DL snap burst",
-           "Permutation importance on the refit champion models, 20 shuffles each (bars = mean, lines = SD)")
+           "Permutation importance on the refit champion models (in-sample, descriptive), 20 shuffles each; bars = mean, lines = SD")
     _save(fig, cfg, "fig13_feature_importance.png", "registered champion models")
 
 
@@ -435,6 +451,7 @@ def fig_translation_gap(cfg, gap):
     fig.subplots_adjust(left=0.3, right=0.95, top=0.85, bottom=0.1)
     cols = [ACCENT if v > 0 else ORANGE for v in pick.translation_gap]
     ax.barh(range(len(pick)), pick.translation_gap, color=cols, height=0.7, alpha=0.9)
+    ax.set_ylim(-0.7, len(pick) + 0.2)
     ax.set_yticks(range(len(pick)), [f"{r.display_name} ({r.nfl_position}, {int(r.draft_year)}, {r.n_plays} plays)" for r in pick.itertuples()], fontsize=8.5)
     for i, r in enumerate(pick.itertuples()):
         ax.text(r.translation_gap + (0.6 if r.translation_gap > 0 else -0.6), i, f"{r.sbi:.0f} vs {r.predicted_sbi:.0f}",
@@ -444,7 +461,7 @@ def fig_translation_gap(cfg, gap):
     lim = np.abs(pick.translation_gap).max() + 6
     ax.set_xlim(-lim, lim)
     ax.text(lim * 0.97, len(pick) - 0.4, "Plays faster than he tested", ha="right", fontsize=8.5, color=ACCENT, fontweight="bold")
-    ax.text(-lim * 0.97, 0.4, "Tested faster than he plays", ha="left", fontsize=8.5, color=ORANGE, fontweight="bold")
+    ax.text(-lim * 0.97, len(pick) - 0.4, "Tested faster than he plays", ha="left", fontsize=8.5, color=ORANGE, fontweight="bold")
     _title(fig, "Defensive linemen whose get-off departs most from what their testing predicted",
            "Six largest positive and negative translation gaps; labels = game SBI vs Combine-predicted SBI (out-of-fold)")
     _save(fig, cfg, "fig14_translation_gap.png", "nested-CV out-of-fold predictions of the champion regressor")

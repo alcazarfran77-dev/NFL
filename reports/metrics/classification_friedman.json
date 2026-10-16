@@ -1,0 +1,42 @@
+{
+  "all_prospects/combine": {
+    "statistic": 10.133333333333326,
+    "p_value": 0.006303396482417307,
+    "rank_1_is": "best",
+    "mean_ranks": {
+      "logistic_regression": 2.2666666666666666,
+      "random_forest": 2.4,
+      "xgboost": 1.3333333333333333
+    }
+  },
+  "all_prospects/combine_draft": {
+    "statistic": 3.73333333333332,
+    "p_value": 0.1546382645492558,
+    "rank_1_is": "best",
+    "mean_ranks": {
+      "logistic_regression": 2.4,
+      "random_forest": 1.8666666666666667,
+      "xgboost": 1.7333333333333334
+    }
+  },
+  "tracked_subset/combine_draft": {
+    "statistic": 1.0508474576271167,
+    "p_value": 0.5913047584123494,
+    "rank_1_is": "best",
+    "mean_ranks": {
+      "logistic_regression": 2.033333333333333,
+      "random_forest": 2.1666666666666665,
+      "xgboost": 1.8
+    }
+  },
+  "tracked_subset/combine_draft_mov": {
+    "statistic": 3.15254237288135,
+    "p_value": 0.20674457466952084,
+    "rank_1_is": "best",
+    "mean_ranks": {
+      "logistic_regression": 2.1333333333333333,
+      "random_forest": 2.2333333333333334,
+      "xgboost": 1.6333333333333333
+    }
+  }
+}

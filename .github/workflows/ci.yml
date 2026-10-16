@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test-and-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Unit tests
+        run: make test
+      # Raw data is not committed (versioned by hash in data/manifest.json).
+      # Provide it through a secure artifact store before enabling the smoke run, e.g.:
+      # - run: aws s3 sync s3://<bucket>/cgmt/raw data/raw && sha256sum -c data/raw.sha256
+      - name: Verify raw data hashes
+        if: hashFiles('data/raw/*.csv') != ''
+        run: |
+          python - <<'PY'
+          import json, hashlib, pathlib, sys
+          m = json.loads(pathlib.Path("data/manifest.json").read_text())
+          bad = [f for f, e in m["files"].items()
+                 if hashlib.sha256(pathlib.Path("data/raw", f).read_bytes()).hexdigest() != e["sha256"]]
+          sys.exit(f"hash mismatch: {bad}" if bad else 0)
+          PY
+      - name: Smoke pipeline
+        if: hashFiles('data/raw/*.csv') != ''
+        run: make smoke
