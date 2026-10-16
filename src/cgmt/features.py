@@ -11,12 +11,17 @@ v2.0.0 adds two sets built on player_play:
                         (models.OnFieldProjector); at prediction time only Combine data is used,
                         so the set is usable on draft day.
   combine_draft_perf  + observed on-field performance (post-draft; diagnostic, like the movement set)
+
+v2.1.0 adds, only when combine_tracking.csv (spec File 3) is present:
+  combine_draft_ct    + Combine drill-tracking features (cgmt.combine_tracking); pre-draft safe
+  ATHLETIC_CT         athletic regression features + drill tracking (athletic vs athletic + tracking)
 """
 from __future__ import annotations
 
 import pandas as pd
 
 from .cleaning import DRILLS, MEASURABLES
+from .combine_tracking import CT_FEATURES
 from .movement import METRICS
 
 DERIVED = ["speed_score", "ten_split_share", "ten_split_momentum"]
@@ -39,6 +44,16 @@ PROJECTOR_TARGETS = [f"onfield_target_{m}" for m in PROJECTED]
 PERF_FEATURES = [f"{m}_z" for m in PROJECTED]
 FEATURE_SETS["combine_draft_proj"] = FEATURE_SETS["combine_draft"] + PROJECTOR_TARGETS
 FEATURE_SETS["combine_draft_perf"] = FEATURE_SETS["combine_draft"] + PERF_FEATURES
+
+# v2.1.0 Combine drill tracking (used only when the file is present).
+CT_SET = CT_FEATURES + ["ct_missing"]
+ATHLETIC_CT = ATHLETIC + CT_SET
+FEATURE_SETS["combine_draft_ct"] = FEATURE_SETS["combine_draft"] + CT_SET
+
+
+def has_combine_tracking(prospects: pd.DataFrame) -> bool:
+    """True when the prospects table carries drill-tracking features for at least one player."""
+    return all(c in prospects.columns for c in CT_SET) and bool((prospects["ct_missing"] == 0).any())
 
 
 def regression_table(prospects: pd.DataFrame, profiles: pd.DataFrame, target: str) -> pd.DataFrame:

@@ -639,7 +639,10 @@ def make_all_figures(cfg: Config) -> None:
     prospects = pd.read_parquet(p / "prospects.parquet")
     plays = pd.read_parquet(p / "play_metrics.parquet")
     profiles = pd.read_parquet(p / "player_movement_profiles.parquet")
-    frames = pd.read_parquet(i / "tracking_frames.parquet")
+    # Only the frames the speed-trace figure can use (DL players), so spec-scale tracking stays out of memory.
+    dl_ids = profiles.loc[profiles.combine_position == "DL", "nfl_id"].astype(int).tolist()
+    frames = pd.read_parquet(i / "tracking_frames.parquet", columns=["game_id", "play_id", "nfl_id", "time", "s", "event"],
+                             filters=[("nfl_id", "in", dl_ids)])
     fig_drill_coverage(cfg, prospects)
     fig_drill_correlations(cfg, prospects)
     fig_burst_distribution(cfg, plays, pd.read_csv(m / "play_metric_anomalies.csv"))

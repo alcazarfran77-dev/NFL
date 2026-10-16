@@ -1,4 +1,4 @@
-# CGMT — Combine-to-Game Movement Translation (v2.0.0)
+# CGMT — Combine-to-Game Movement Translation (v2.1.0)
 
 Do NFL Combine drills predict how a prospect moves and performs in regular-season
 games, and does that tell us who becomes a starter? This project answers it for one
@@ -15,6 +15,26 @@ narrow slice of movement, **the first seconds after the snap**, measured two way
 The technical report (methods, figures, metrics, statistical tests and
 insights) is published as a Claude doc; `reports/` holds every number and
 figure it cites.
+
+## Data contract (v2.1)
+
+The provider's data structure spec (`docs/Data_structure_CSV_files.docx`) is encoded in
+`configs/data_contract.yaml` and checked on every run (`make validate`, also the first step of
+`make data`). The report `reports/metrics/data_contract_report.csv` has one row per check, with
+severity and the handling the pipeline applies. Errors (missing required file or column,
+duplicate key, broken foreign key) stop the run. Deviations are warnings, handled by business rules.
+
+Against the files delivered: **0 errors, 23 warnings**, and no number changed (v2.1.0 in the changelog).
+What differs from the spec:
+
+| Spec | Delivered | Effect |
+|---|---|---|
+| `combine_tracking.csv`, 6,310 drill attempts | not delivered | `cgmt.combine_tracking` (tested) switches on when the file is added |
+| `game_tracking_2023/2024/2025.csv`, all 510 prospects | `game_tracking_2024_2.csv`, `_2025_2.csv`: Week 18 + playoffs, 279 prospects | SBI uses 221 players with 3+ plays; full files are read as is (split parts are ignored when the full file is present) |
+| `player_play.csv`, 316,338 rows | `player_play_3.csv`, 314,197 rows (-0.68%) | results use the rows delivered |
+| games: REG/POST, weeks 1-18 | also PRE (147 games, weeks 0-3), playoffs weeks 19-23 | R10 on-field = REG; R8b tracking = REG + POST |
+| `down` 1-4 | 961 rows with down 0 (two-point tries) | R15 removes them (none was a family play) |
+| quick/unblocked pressure, recovered fumble, TFL as 1.0/null | TRUE/FALSE text | the boolean parser reads both |
 
 ## Headline findings (v2.0)
 
@@ -56,20 +76,24 @@ figure it cites.
 ```
 configs/config.yaml        single source of truth: paths, business rules, CV, grids
 configs/smoke.yaml         same pipeline on tiny CV/grids (CI)
+configs/data_contract.yaml the provider's data structure spec as a checked contract (v2.1)
+docs/                      Data_structure_CSV_files.docx (the spec)
 data/raw/                  the seven input CSVs (not in git; hashed in data/manifest.json)
 data/processed/            prospects, tracking play metrics, movement profiles, on-field plays + profiles (parquet)
 src/cgmt/
-  data.py                  schema validation, referential integrity, SHA-256 manifest
+  contract.py              data-contract validation and report (v2.1)
+  data.py                  file resolution (spec names + split parts), schemas, integrity, manifest
   cleaning.py              business rules R1-R7, starter target
   movement.py              tracking cleaning (R8-R9), per-play metrics, SBI, reliability
-  performance.py           player_play rules R10-R14, on-field metrics over expected, stability (v2.0)
+  performance.py           player_play rules R10-R15, on-field metrics over expected, stability (v2.0)
+  combine_tracking.py      Combine drill tracking (spec File 3, R16): drill features; on when the file exists (v2.1)
   features.py              nested feature sets
   models.py                PositionMedianImputer, OnFieldProjector, pipelines, nested CV, final refit
   stats.py                 corrected t-test, Wilcoxon-Holm, Friedman, DeLong, bootstrap, mediation
   mlops.py                 MLflow tracking, tags, model registry
   viz.py                   18 report figures
   pipeline.py              CLI orchestrator
-tests/                     25 pytest tests
+tests/                     32 pytest tests
 reports/metrics/           every table behind the report (CSV/JSON)
 reports/figures/           fig01 ... fig18
 mlflow.db, mlartifacts/    experiment store and model registry (in the release archive)
@@ -80,13 +104,14 @@ mlflow.db, mlartifacts/    experiment store and model registry (in the release a
 ```bash
 python -m pip install -r requirements.txt     # Python 3.13, pinned versions
 make relocate                                 # once, after extracting the archive (repoints MLflow paths)
-make test                                     # 25 unit tests, ~5 s
+make validate                                 # data contract only, ~10 s
+make test                                     # 32 unit tests, ~5 s
 make smoke                                    # whole pipeline on tiny grids, ~5 min (own output folders)
 make all                                      # release run, ~45 min on 2 cores
 make ui                                       # MLflow UI: runs + registry
 ```
 
-Stages can be run on their own: `make data`, `make translation`, `make models`,
+Stages can be run on their own: `make validate`, `make data`, `make translation`, `make models`,
 `make stats`, `make figures`. Everything is seeded (`seed: 42`); a test asserts that two fits
 with the same seed give identical predictions.
 
@@ -104,7 +129,9 @@ clf = mlflow.sklearn.load_model("models:/cgmt-starter-classifier@champion")
   [CHANGELOG.md](CHANGELOG.md). MAJOR = a metric/target definition changed,
   MINOR = new analysis or model, PATCH = no number in `reports/metrics/` changes.
 - **Data:** `data/manifest.json` stores SHA-256, bytes and rows per raw file and a
-  combined `data_version`; CI fails on a hash mismatch.
+  combined `data_version`; CI fails on a hash mismatch. The data contract
+  (`configs/data_contract.yaml`) is versioned with the code: a change in the provider's spec
+  is a contract change recorded in the changelog.
 - **Experiments:** each MLflow run is tagged with `pipeline_version`,
   `data_version`, `git_commit` and `seed`.
 - **Models:** registered with aliases (`champion`, `challenger`) and a
@@ -112,12 +139,12 @@ clf = mlflow.sklearn.load_model("models:/cgmt-starter-classifier@champion")
 
 ## Data notes
 
-- The Combine file holds drill **results**, not drill tracking, so "movement
-  during drills" is measured by times and distances.
+- The Combine file holds drill **results**. The spec also lists drill tracking (`combine_tracking.csv`),
+  which was not delivered, so "movement during drills" is measured by times and distances until it is.
 - Tracking covers Week 18 and the playoffs of the 2024 and 2025 seasons, with 1–4
   tracked players per play and no ball or opponents, so the SBI uses individual kinematics.
 - `player_play` (v2.0) covers every game of 2023-2025 for 497 prospects; the on-field metrics
-  use regular-season, non-nullified plays only (240,412 rows). DBs get no on-field metric (the
+  use regular-season, non-nullified plays on downs 1-4 only (239,673 rows). DBs get no on-field metric (the
   file has no coverage outcome). "Expected" is the average of prospect plays in the same context.
 - The careers table covers seasons through 2025; start rate is normalised by the
   seasons each class has been in the league.

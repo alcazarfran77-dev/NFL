@@ -16,10 +16,12 @@ raw_files:
   players: players.csv
   careers: player_career_successes.csv
   games: games.csv
-  tracking:
-  - game_tracking_2024_2.csv
-  - game_tracking_2025_2.csv
-  player_play: player_play_3.csv
+  tracking: game_tracking_*.csv
+  player_play: player_play*.csv
+  combine_tracking: combine_tracking*.csv
+contract:
+  path: configs/data_contract.yaml
+  fail_on_error: true
 mlflow:
   tracking_uri: sqlite:///mlflow_smoke.db
   artifact_location: mlartifacts_smoke
@@ -78,6 +80,7 @@ business_rules:
     - 0
     - 50
 tracking_rules:
+  season_types: [REG, POST]
   frame_rate_hz: 10
   snap_events:
   - ball_snap
@@ -97,6 +100,11 @@ performance_rules:
   season_types:
   - REG
   exclude_nullified: true
+  valid_downs: [1, 2, 3, 4]
+  alignment_codes:
+    DL: {EDGE: EDGE, DE: EDGE, INTERIOR_LINE: INTERIOR_LINE, DT: INTERIOR_LINE, NT: INTERIOR_LINE}
+    OL: {T: T, G: G, C: C}
+    WRTE: {WR: WR, SLOT_WR: SLOT_WR, TE: TE}
   families:
     DL: DL
     OL: OL

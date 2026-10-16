@@ -1,4 +1,7 @@
 {
+  "tracking_files": 2,
+  "frames_excluded_season_type": 0,
+  "plays_split_across_files": 0,
   "frames_in": 193989,
   "plays_with_frame_gaps": 0,
   "frames_s_above_cap": 0,
@@ -16,8 +19,9 @@
   "pp_players": 497,
   "pp_rows_not_regular_season": 64928,
   "pp_rows_nullified": 8857,
+  "pp_rows_invalid_down": 739,
   "pp_get_off_out_of_range": 21,
-  "pp_rows_regular_season": 240412,
+  "pp_rows_regular_season": 239673,
   "onfield_plays_DL": 26980,
   "onfield_plays_OL": 46492,
   "onfield_plays_WRTE": 37816,
@@ -27,5 +31,7 @@
   "players_with_paoe": 70,
   "players_with_soe": 96,
   "players_with_perf_index": 255,
-  "seconds": 14.1
+  "contract_status": "pass_with_warnings",
+  "contract_warnings": 23,
+  "seconds": 22.2
 }

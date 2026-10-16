@@ -1,8 +1,15 @@
-# Model card — CGMT v2.0.0
+# Model card — CGMT v2.1.0
 
 Release run: clean MLflow store `mlflow.db`, experiment `cgmt-combine-translation`,
 data_version `dfc567c4ffe3` (seven raw files), seed 42. All scores are nested-CV out-of-sample
 (5 folds x 3 repeats) unless stated.
+
+v2.1.0 adds a data contract that checks the raw files against the provider's data structure spec
+(0 errors, 23 warnings; see the README). The models' inputs are identical, so the
+models are the v2.0.0 runs (`pipeline_version = 2.0.0`). When the spec's `combine_tracking.csv`
+arrives, the pipeline also trains drill-tracking challengers (`<regressor>-ct@challenger`,
+`cgmt-starter-classifier-combine-tracking@challenger`). The champion changes only if the
+tracking set beats Combine + draft on mean AUC with DeLong p < 0.05.
 
 ## Registered models
 
@@ -51,8 +58,10 @@ example define the exact schema. Missing drills are allowed (imputed in-pipeline
   other feature); it partly encodes team investment, so it predicts opportunity as much as ability.
 - Small samples: 54 DL players, 14 DL starters; DL regression gains are consistent across folds
   (Wilcoxon, Holm p = 0.02) but not significant under the corrected resampled t-test (Holm p = 0.45).
-- Tracking covers late-season and playoff games only, with no opponents; on-field metrics cover
+- Tracking covers late-season and playoff games only (the spec describes full 2023-2025 season files;
+  2024-2025 Week 18 + playoff parts were delivered), with no opponents. On-field metrics cover
   the 2023-2025 regular seasons, with "expected" computed from prospects' plays, not the league.
+- Drill movement is measured by official results only: the spec's Combine drill tracking was not delivered.
 - The on-field challenger is circular by design (performance and starts share seasons).
 - Pickled with cloudpickle (the pipeline contains a project transformer): load only from this
   trusted registry.

@@ -185,6 +185,11 @@ def within_group_spearman(df: pd.DataFrame, xs: list[str], ys: list[str], group:
                 boots.append(stats.spearmanr(a[idx], b[idx])[0])
             lo, hi = np.nanpercentile(boots, [2.5, 97.5])
             rows.append({"x": x, "y": y, "n": len(d), "rho": rho, "ci_low": lo, "ci_high": hi, "p_value": p})
-    out = pd.DataFrame(rows)
-    out["q_value"] = stats.false_discovery_control(out["p_value"].to_numpy(), method="bh")
+    out = pd.DataFrame(rows, columns=["x", "y", "n", "rho", "ci_low", "ci_high", "p_value"])
+    # BH over the finite p-values (a constant column gives rho = NaN; it is reported, not tested)
+    p = out["p_value"].to_numpy(dtype=float)
+    q = np.full(len(p), np.nan)
+    if np.isfinite(p).any():
+        q[np.isfinite(p)] = stats.false_discovery_control(p[np.isfinite(p)], method="bh")
+    out["q_value"] = q
     return out

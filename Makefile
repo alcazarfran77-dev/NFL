@@ -2,7 +2,7 @@ PY ?= python3
 export PYTHONPATH := src
 export MLFLOW_DISABLE_AGENT_HINT := 1
 
-.PHONY: install test smoke data translation models stats figures all ui relocate clean
+.PHONY: install test smoke validate data translation models stats figures all ui relocate clean
 
 install:            ## install pinned dependencies
 	$(PY) -m pip install -r requirements.txt
@@ -13,7 +13,10 @@ test:               ## unit tests (cleaning rules, movement metrics, statistics,
 smoke:              ## whole pipeline on tiny CV/grids (CI)
 	$(PY) -m cgmt.pipeline --config configs/smoke.yaml --stage all
 
-data:               ## ingest + clean + movement metrics + manifest
+validate:           ## data contract only: raw files vs docs/Data_structure_CSV_files.docx -> reports/metrics/data_contract_*
+	$(PY) -m cgmt.pipeline --stage contract
+
+data:               ## contract + ingest + clean + movement + on-field metrics + manifest
 	$(PY) -m cgmt.pipeline --stage data
 
 translation:        ## drill-vs-game statistics, reliability, GLM

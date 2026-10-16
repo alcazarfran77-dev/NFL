@@ -30,6 +30,9 @@ jobs:
                  if hashlib.sha256(pathlib.Path("data/raw", f).read_bytes()).hexdigest() != e["sha256"]]
           sys.exit(f"hash mismatch: {bad}" if bad else 0)
           PY
+      - name: Data contract (provider's data structure spec)
+        if: hashFiles('data/raw/*.csv') != ''
+        run: make validate
       - name: Smoke pipeline
         if: hashFiles('data/raw/*.csv') != ''
         run: make smoke

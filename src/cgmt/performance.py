@@ -20,6 +20,11 @@ Business rules (configs/config.yaml -> performance_rules)
   R12 NGS get-off outside [0.30, 2.00) s treated as missing;
   R13 minimum qualifying plays per family (DL 20 rush snaps, OL 50 pass-block snaps, WR/TE 30 routes);
   R14 DBs get no on-field metric: the file holds their alignment and assignment but no coverage outcome.
+  R15 (v2.1.0) downs outside the spec's 1-4 (down 0: two-point tries, untimed downs) removed.
+
+v2.1.0 conformance with the data structure spec: boolean flags are parsed whether the file stores
+TRUE/FALSE text (as delivered) or 1.0/0.0 floats (as the spec documents); alignment cells come from
+`performance_rules.alignment_codes`, which also maps the spec's DE / DT / NT codes.
 """
 from __future__ import annotations
 
@@ -35,8 +40,20 @@ BOOL_COLS = ["target", "pressure_allowed", "blitzing", "unblocked_pressure"]
 KEY = ["game_id", "play_id", "nfl_id"]
 
 
+_BOOL_CODES = {"TRUE": 1.0, "T": 1.0, "1": 1.0, "1.0": 1.0, "FALSE": 0.0, "F": 0.0, "0": 0.0, "0.0": 0.0}
+
+
 def _parse_bool(s: pd.Series) -> pd.Series:
-    return s.astype("string").str.upper().map({"TRUE": 1.0, "FALSE": 0.0}).astype("float64")
+    """TRUE/FALSE, True/False, 1/0 and 1.0/0.0 -> 1.0/0.0; anything else (incl. NA) -> NaN."""
+    if pd.api.types.is_bool_dtype(s) or pd.api.types.is_numeric_dtype(s):
+        v = pd.to_numeric(s, errors="coerce").astype("float64")
+        return v.where(v.isin([0.0, 1.0]))
+    return s.astype("string").str.strip().str.upper().map(_BOOL_CODES).astype("float64")
+
+
+def _alignment(codes: pd.Series, mapping: dict[str, str]) -> pd.Series:
+    """lined_up_position -> alignment cell for the "expected" model; unmapped codes -> OTHER."""
+    return codes.map(mapping).fillna("OTHER").astype(codes.dtype)
 
 
 def clean_player_play(pp: pd.DataFrame, games: pd.DataFrame, prospects: pd.DataFrame,
@@ -64,6 +81,11 @@ def clean_player_play(pp: pd.DataFrame, games: pd.DataFrame, prospects: pd.DataF
         nullified = df["play_nullified_by_penalty"].eq("Y")
         audit["pp_rows_nullified"] = int((keep & nullified).sum())
         keep &= ~nullified
+    valid_downs = rules.get("valid_downs")  # R15
+    if valid_downs:
+        bad_down = ~df["down"].isin(valid_downs)
+        audit["pp_rows_invalid_down"] = int((keep & bad_down).sum())
+        keep &= ~bad_down
     lo, hi = rules["get_off_valid_s"]  # R12
     bad_go = df["player_get_off"].notna() & ~df["player_get_off"].between(lo, hi, inclusive="left")
     audit["pp_get_off_out_of_range"] = int((keep & bad_go).sum())
@@ -87,12 +109,16 @@ def _expected(df: pd.DataFrame, value: str, keys: list[str], fallback: list[str]
 def family_plays(plays: pd.DataFrame, cfg: Config) -> dict[str, pd.DataFrame]:
     """Per-family play tables with the over-expected metrics."""
     rules = cfg["performance_rules"]
+    codes = rules.get("alignment_codes", {
+        "DL": {"EDGE": "EDGE", "INTERIOR_LINE": "INTERIOR_LINE"},
+        "OL": {"T": "T", "G": "G", "C": "C"},
+        "WRTE": {"WR": "WR", "SLOT_WR": "SLOT_WR", "TE": "TE"}})
     out = {}
 
     # DL pass-rush snaps: a pass play where the lineman rushed (no coverage assignment).
     dl = plays[(plays.family == "DL") & plays["sack"].notna() & (plays.is_pass == 1)
                & (plays.coverage_assignment.isna() | plays.coverage_assignment.eq("NO_ASSIGNMENT"))].copy()
-    dl["alignment"] = dl.lined_up_position.where(dl.lined_up_position.isin(["EDGE", "INTERIOR_LINE"]), "OTHER")
+    dl["alignment"] = _alignment(dl.lined_up_position, codes["DL"])
     dl["pressure"] = dl["time_to_pressure"].notna().astype(float)
     dl["goe"] = _expected(dl, "player_get_off", ["alignment"]) - dl["player_get_off"]
     dl["proe"] = dl["pressure"] - _expected(dl, "pressure", ["alignment"])
@@ -100,17 +126,17 @@ def family_plays(plays: pd.DataFrame, cfg: Config) -> dict[str, pd.DataFrame]:
 
     # OL pass-block snaps.
     ol = plays[(plays.family == "OL") & plays.peak_pressure_probability_allowed.notna()].copy()
-    ol["alignment"] = ol.lined_up_position.where(ol.lined_up_position.isin(["T", "G", "C"]), "OTHER")
+    ol["alignment"] = _alignment(ol.lined_up_position, codes["OL"])
     q = rules["dropback_quantiles"]
     ol["dropback_bin"] = pd.qcut(ol.dropback_duration, q, labels=False, duplicates="drop").fillna(-1).astype(int)
-    ol["pressure_allowed"] = ol["pressure_allowed"].fillna(0.0)
     ol["ppoe"] = _expected(ol, "peak_pressure_probability_allowed", ["alignment", "dropback_bin"]) - ol.peak_pressure_probability_allowed
+    # v2.1.0: paoe only where pressure_allowed is recorded (was: missing = no pressure; 0 rows affected here).
     ol["paoe"] = _expected(ol, "pressure_allowed", ["alignment", "dropback_bin"]) - ol["pressure_allowed"]
     out["OL"] = ol
 
     # WR/TE routes with a separation reading.
     wr = plays[(plays.family == "WRTE") & plays.separation_at_pass_forward.notna() & plays.route_ran.notna()].copy()
-    wr["alignment"] = wr.lined_up_position.where(wr.lined_up_position.isin(["WR", "SLOT_WR", "TE"]), "OTHER")
+    wr["alignment"] = _alignment(wr.lined_up_position, codes["WRTE"])
     wr["soe"] = wr.separation_at_pass_forward - _expected(wr, "separation_at_pass_forward", ["route_ran", "alignment"],
                                                           fallback=["route_ran"], min_n=30)
     out["WRTE"] = wr

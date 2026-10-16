@@ -1,6 +1,7 @@
-"""End-to-end pipeline: python -m cgmt.pipeline [--stage all|data|translation|models|stats|figures|relocate]
+"""End-to-end pipeline: python -m cgmt.pipeline [--stage all|contract|data|translation|models|stats|figures|relocate]
 
 Stages
+  0 contract     validate the raw files against the provider's data structure spec (v2.1.0)
   1 ingest       validate raw CSVs, write the data manifest (hashes)
   2 clean        prospect table + business rules + audit log
   3 movement     tracking -> per-play metrics -> per-player profiles + SBI
@@ -25,12 +26,13 @@ from scipy import stats as sst
 from sklearn.inspection import permutation_importance
 from sklearn.metrics import roc_auc_score
 
-from . import __version__, mlops
+from . import __version__, combine_tracking, mlops
 from .cleaning import build_prospects, missingness_by_position
 from .config import Config, load_config, set_global_seed
-from .data import load_raw, write_manifest
-from .features import (FEATURE_SETS, ATHLETIC, classification_table, onfield_classification_table,
-                       onfield_regression_table, projector_table, regression_table, xy)
+from .contract import load_contract, validate_all, write_report
+from .data import PRIMARY_KEYS, iter_tracking, load_raw, table_files, write_manifest
+from .features import (FEATURE_SETS, ATHLETIC, ATHLETIC_CT, CT_SET, classification_table, has_combine_tracking,
+                       onfield_classification_table, onfield_regression_table, projector_table, regression_table, xy)
 from .models import nested_cv, refit_final
 from .movement import METRICS, clean_tracking, estimator_bias, metric_reliability, play_metrics, player_profiles
 from .performance import (ONFIELD_METRICS, clean_player_play, context_adjusted_burst, family_plays,
@@ -83,23 +85,97 @@ def _dump(obj, cfg: Config, name: str) -> None:
 
 
 # ----------------------------------------------------------------------------- 1-3 data
+def stage_contract(cfg: Config) -> dict:
+    """Validate the raw files against configs/data_contract.yaml (the provider's spec)."""
+    ccfg = cfg.raw.get("contract", {})
+    contract = load_contract(ccfg.get("path"))
+    report, summary = validate_all(cfg, contract)
+    write_report(cfg, report, summary)
+    log.info("data contract: %s (%d checks, %d errors, %d warnings, missing %s)", summary["status"], summary["n_checks"],
+             summary["n_errors"], summary["n_warnings"], [m["spec_name"] for m in summary["missing_files"]])
+    if summary["n_errors"] and ccfg.get("fail_on_error", True):
+        bad = report[(report.severity == "error") & (report.result == "fail")]
+        raise RuntimeError("data contract errors:\n" + bad[["table", "file", "column", "check", "detail"]].to_string())
+    return summary
+
+
+def _process_tracking(cfg: Config, games: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    """Clean tracking and compute per-play metrics one file at a time (spec-scale seasons).
+
+    R8b keeps the season types in `tracking_rules.season_types`. A play whose frames are split
+    across file parts is set aside and processed once all parts are read. Frames are appended to
+    data/interim/tracking_frames.parquet as they are cleaned. Output order = sorted play key,
+    identical to processing the concatenated files.
+    """
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    rules = cfg["tracking_rules"]
+    keep_games = set(games.loc[games.season_type.isin(rules.get("season_types", ["REG", "POST"])), "game_id"])
+    key = ["game_id", "play_id", "nfl_id"]
+    paths = table_files(cfg, "tracking")
+    keysets = [pd.read_csv(p, usecols=key).drop_duplicates() for p in paths]
+    spanning = (pd.concat(keysets, ignore_index=True).value_counts().reset_index(name="n").query("n > 1")[key]
+                if len(keysets) > 1 else pd.DataFrame(columns=key))
+    audit: dict = {"tracking_files": len(paths), "frames_excluded_season_type": 0, "plays_split_across_files": len(spanning)}
+    out_path = cfg.path("interim") / "tracking_frames.parquet"
+    writer, plays, held = None, [], []
+
+    def run(frames_raw: pd.DataFrame) -> None:
+        nonlocal writer
+        frames, fa = clean_tracking(frames_raw, cfg)
+        pm, pa_ = play_metrics(frames, cfg)
+        for k, v in {**fa, **pa_}.items():
+            audit[k] = audit.get(k, 0) + v
+        plays.append(pm)
+        table = pa.Table.from_pandas(frames, preserve_index=False)
+        if writer is None:
+            writer = pq.ParquetWriter(out_path, table.schema)
+        writer.write_table(table.cast(writer.schema))
+
+    for name, df in iter_tracking(cfg):
+        season_ok = df.game_id.isin(keep_games)
+        audit["frames_excluded_season_type"] += int((~season_ok).sum())
+        df = df[season_ok]
+        if len(spanning):
+            m = df.merge(spanning.assign(_span=1), on=key, how="left")["_span"].notna().to_numpy()
+            held.append(df[m])
+            df = df[~m]
+        log.info("tracking %s: %d frames", name, len(df))
+        run(df.reset_index(drop=True))
+    if held:
+        run(pd.concat(held, ignore_index=True))
+    if writer is not None:
+        writer.close()
+    plays_df = pd.concat(plays, ignore_index=True) if plays else pd.DataFrame(columns=key)
+    if plays_df.duplicated(key).any():
+        raise RuntimeError("tracking: a play was processed twice across files")
+    return plays_df.sort_values(key, kind="mergesort").reset_index(drop=True), audit
+
+
 def stage_data(cfg: Config) -> dict:
     t0 = time.time()
-    tables = load_raw(cfg)
+    contract_summary = stage_contract(cfg)
+    tables = load_raw(cfg, tracking=False)
     manifest = write_manifest(cfg)
     log.info("ingest ok: data_version=%s", manifest["data_version"])
 
     prospects, audit = build_prospects(tables, cfg)
+    ct_audit = {}
+    if "combine_tracking" in tables:  # v2.1.0, spec File 3 (optional)
+        attempts, ct_feats, ct_audit = combine_tracking.build(tables["combine_tracking"], prospects, cfg)
+        _save(attempts, cfg, "combine_tracking_attempts.parquet")
+        _save(ct_feats, cfg, "combine_tracking_features.parquet")
+        prospects = prospects.merge(ct_feats, on="nfl_id", how="left", validate="1:1")
+        log.info("combine tracking: %s", ct_audit)
     _save(prospects, cfg, "prospects.parquet")
     _save(audit, cfg, "cleaning_audit.csv", key="metrics")
     miss = missingness_by_position(prospects)
     miss.to_csv(cfg.path("metrics") / "drill_missingness_by_position.csv")
 
-    frames, frame_audit = clean_tracking(tables["tracking"], cfg)
-    plays, play_audit = play_metrics(frames, cfg)
+    plays, tracking_audit = _process_tracking(cfg, tables["games"])
     plays = plays.merge(prospects[["nfl_id", "combine_position"]], on="nfl_id", how="left")
     _save(plays, cfg, "play_metrics.parquet")
-    frames.to_parquet(cfg.path("interim") / "tracking_frames.parquet", index=False)
 
     profiles = player_profiles(plays, prospects, cfg)
     _save(profiles, cfg, "player_movement_profiles.parquet")
@@ -132,12 +208,14 @@ def stage_data(cfg: Config) -> dict:
         onf_audit.update({f"players_with_{m}": int(onfield[f"{m}_eb"].notna().sum()) for m in ONFIELD_METRICS})
         onf_audit["players_with_perf_index"] = int(onfield.perf_index.notna().sum())
 
-    audit_all = {**frame_audit, **play_audit, "cleaning_rule_changes": len(audit),
+    audit_all = {**tracking_audit, **ct_audit, "cleaning_rule_changes": len(audit),
                  "players_tracked": int(plays.nfl_id.nunique()), "players_profiled": len(profiles),
-                 "play_metric_anomalies": len(anomalies), **onf_audit, "seconds": round(time.time() - t0, 1)}
+                 "play_metric_anomalies": len(anomalies), **onf_audit,
+                 "contract_status": contract_summary["status"], "contract_warnings": contract_summary["n_warnings"],
+                 "seconds": round(time.time() - t0, 1)}
     _dump(audit_all, cfg, "data_audit.json")
     log.info("data stage: %s", audit_all)
-    return {"prospects": prospects, "plays": plays, "profiles": profiles, "frames": frames,
+    return {"prospects": prospects, "plays": plays, "profiles": profiles, "frames": None,
             "onfield": onfield, "onfield_rookie": onfield_rookie, "fam": fam}
 
 
@@ -249,6 +327,39 @@ def stage_translation(cfg: Config, d: dict) -> dict:
     out = {"matrix": matrix, "starter_assoc": starter_assoc, "bands": tab, "glm": glm}
     if d.get("onfield") is not None:
         out["onfield"] = stage_onfield_translation(cfg, d)
+    if has_combine_tracking(prospects):
+        out["combine_tracking"] = stage_combine_tracking_translation(cfg, d)
+    return out
+
+
+def stage_combine_tracking_translation(cfg: Config, d: dict) -> dict:
+    """v2.1.0 (only with combine_tracking.csv): tracking vs official results, and drill tracking vs the game.
+
+    Separate output files, so the v2.0.0 matrices and their FDR q-values are untouched.
+    """
+    nb, seed = cfg["cv"]["bootstrap_resamples"], cfg.seed
+    prospects = d["prospects"]
+    feats = prospects[["nfl_id"] + CT_SET]
+    _save(combine_tracking.official_vs_tracking(feats, prospects), cfg, "ct_official_validity.csv", key="metrics")
+    xs = list(combine_tracking.CT_FEATURES)
+
+    def orient(df: pd.DataFrame) -> pd.DataFrame:
+        o = df.copy()
+        for c in combine_tracking.CT_LOWER_IS_BETTER:
+            o[c] = -o[c]
+        return o
+
+    game = orient(d["profiles"].merge(prospects, on=["nfl_id", "combine_position"], how="inner"))
+    mat = within_group_spearman(game, xs, TRANSLATION_Y + ["start_rate"], "combine_position", nb, seed)
+    mat["x_oriented"] = mat["x"].isin(combine_tracking.CT_LOWER_IS_BETTER)
+    _save(mat, cfg, "ct_translation_matrix.csv", key="metrics")
+    out = {"matrix": mat}
+    if d.get("onfield") is not None:
+        on = orient(d["onfield"].drop(columns=["combine_position"]).merge(prospects, on="nfl_id", how="inner"))
+        om = within_group_spearman(on, xs, ONFIELD_Y, "combine_position", nb, seed)
+        om["x_oriented"] = om["x"].isin(combine_tracking.CT_LOWER_IS_BETTER)
+        _save(om, cfg, "ct_onfield_translation_matrix.csv", key="metrics")
+        out["onfield_matrix"] = om
     return out
 
 
@@ -329,16 +440,17 @@ REG_MODELS = ["position_mean", "ridge", "random_forest", "xgboost"]
 
 
 def _regress(cfg: Config, pop: str, df: pd.DataFrame, target: str, strata: pd.Series, reg_name: str,
-             gap_cols: list[str], extra_tags: dict | None = None) -> dict:
-    """Nested CV of the four regressors on one population, tests, champion refit + registry."""
+             gap_cols: list[str], extra_tags: dict | None = None, features: list[str] | None = None,
+             feature_set: str = "athletic", alias: str = "champion") -> dict:
+    """Nested CV of the four regressors on one population, tests, final refit + registry."""
     grids = cfg["regression"]["grids"]
     df = df.reset_index(drop=True)
     strata = strata.reset_index(drop=True)
-    X, y = xy(df, ATHLETIC, target)
+    X, y = xy(df, features or ATHLETIC, target)
     results = {}
     for name in REG_MODELS:
         t0 = time.time()
-        res = nested_cv(name, "athletic", "regression", X, y, strata, grids.get(name, {}), cfg, cfg.seed)
+        res = nested_cv(name, feature_set, "regression", X, y, strata, grids.get(name, {}), cfg, cfg.seed)
         with mlops.run(cfg, f"reg-{pop}-{name}", {"stage": "cv", "task": "regression", "target": target,
                                                   "population": pop, **(extra_tags or {})}):
             mlops.log_cv_result(res, {"grid": json.dumps(grids.get(name, {})), "population": pop, "n_rows": len(df)})
@@ -365,7 +477,7 @@ def _regress(cfg: Config, pop: str, df: pd.DataFrame, target: str, strata: pd.Se
         mlflow.log_params({"model": champ, "population": pop, "target": target,
                            **{k.replace("model__", ""): v for k, v in best.items()}})
         mlflow.log_metric("refit_inner_cv_rmse", -score)
-        mlops.log_and_register(est, X, "regression", reg_name if cfg["mlflow"]["register_models"] else None, "champion")
+        mlops.log_and_register(est, X, "regression", reg_name if cfg["mlflow"]["register_models"] else None, alias)
 
     # Translation gap: observed minus Combine-predicted (out-of-fold, mean over repeats).
     oof = results[champ].oof.groupby("row")["pred"].mean()
@@ -378,8 +490,10 @@ def _regress(cfg: Config, pop: str, df: pd.DataFrame, target: str, strata: pd.Se
     imp = pd.DataFrame({"population": pop, "feature": X.columns, "importance": pi.importances_mean,
                         "std": pi.importances_std}).sort_values("importance", ascending=False)
     return {"summary": summary, "tests": tests, "friedman": fried, "gap": gap, "importance": imp,
+            "scores": scores, "n_train": any_res.n_train, "n_test": any_res.n_test, "feature_set": feature_set,
             "champion": {"model": champ, "params": best, "inner_rmse": -score, "target": target,
-                         "registered_as": reg_name}}
+                         "registered_as": reg_name,
+                         **({} if feature_set == "athletic" else {"feature_set": feature_set, "alias": alias})}}
 
 
 def stage_regression(cfg: Config, d: dict) -> dict:
@@ -411,13 +525,42 @@ def stage_regression(cfg: Config, d: dict) -> dict:
             runs.append(_regress(cfg, task["name"], df, task["target"], strata, reg_name,
                                  gap_cols + [f"{metric}_rel", f"n_{metric}"], {"family": "onfield"}))
 
+    # v2.1.0: athletic vs athletic + Combine drill tracking, same rows and folds (only with combine_tracking.csv)
+    ct_runs, ct_rows = [], []
+    if cfg["regression"].get("combine_tracking_comparison", True) and has_combine_tracking(d["prospects"]):
+        for base in list(runs):
+            pop = base["summary"].population.iloc[0]
+            if pop == "all_positions":
+                continue  # SBI is a trait only on the DL (v0.9.0); the all-position target is noise elsewhere
+            if pop == "defensive_line":
+                df = full[full.combine_position == "DL"]
+                strata, tgt = df["dl_role"], target
+            else:
+                task = next(t for t in cfg["regression"]["onfield_tasks"] if t["name"] == pop)
+                df = onfield_regression_table(d["prospects"], d["onfield"], task["target"], task["positions"])
+                strata, tgt = _strata(_role(df["nfl_position"]), k), task["target"]
+            reg_name = base["champion"]["registered_as"] + "-ct"
+            r = _regress(cfg, f"{pop}_ct", df, tgt, strata, reg_name, gap_cols, {"family": "combine_tracking"},
+                         features=ATHLETIC_CT, feature_set="athletic_ct", alias="challenger")
+            ct_runs.append(r)
+            for model in REG_MODELS[1:]:
+                for m, hib in (("rmse", False), ("r2", True)):
+                    t = pairwise_model_tests(pd.DataFrame({"athletic_ct": r["scores"][m][model],
+                                                           "athletic": base["scores"][m][model]}),
+                                             m, r["n_train"], r["n_test"], higher_is_better=hib)
+                    ct_rows.append(t.assign(population=pop, model=model))
+        if ct_rows:
+            _save(pd.concat(ct_rows, ignore_index=True), cfg, "regression_ct_comparison.csv", key="metrics")
+    gap_runs = runs
+    runs = runs + ct_runs
+
     summary = pd.concat([r["summary"] for r in runs], ignore_index=True)
     _save(summary, cfg, "regression_summary.csv", key="metrics")
     _save(pd.concat([r["tests"] for r in runs], ignore_index=True), cfg, "regression_pairwise_tests.csv", key="metrics")
     _dump({r["summary"].population.iloc[0]: r["friedman"] for r in runs}, cfg, "regression_friedman.json")
     _dump({r["summary"].population.iloc[0]: r["champion"] for r in runs}, cfg, "regression_final_models.json")
     sbi_pops = set(cfg["regression"]["populations"])
-    gaps = [r["gap"] for r in runs]
+    gaps = [r["gap"] for r in gap_runs]
     sbi_gap = pd.concat([g for g in gaps if g.population.iloc[0] in sbi_pops], ignore_index=True)
     sbi_gap = sbi_gap.rename(columns={"predicted": "predicted_sbi"}).sort_values(["population", "translation_gap"], ascending=[True, False])
     _save(sbi_gap, cfg, "translation_gap.csv", key="metrics")
@@ -443,6 +586,9 @@ def _classification_experiments(d: dict) -> dict:
     else:
         exps["all_prospects"] = (classification_table(d["prospects"]), ["combine", "combine_draft"],
                                  [("combine_draft", "combine")])
+    if has_combine_tracking(d["prospects"]):  # v2.1.0, pre-draft safe
+        exps["all_prospects"][1].append("combine_draft_ct")
+        exps["all_prospects"][2].append(("combine_draft_ct", "combine_draft"))
     exps["tracked_subset"] = (classification_table(d["prospects"], d["profiles"]),
                               ["combine_draft", "combine_draft_mov"], [("combine_draft_mov", "combine_draft")])
     if d.get("onfield") is not None:
@@ -516,15 +662,20 @@ def stage_classification(cfg: Config, d: dict) -> dict:
 
     # Champion (pre-draft): the projector set replaces Combine + draft only if it wins on mean AUC
     # AND its DeLong test against Combine + draft (same model family) has p < 0.05.
-    champ_fs = "combine_draft"
-    if "combine_draft_proj" in experiments["all_prospects"][1]:
-        sp = summary[(summary.population == "all_prospects") & (summary.feature_set == "combine_draft_proj")].sort_values("roc_auc_mean").iloc[-1]
-        sb = summary[(summary.population == "all_prospects") & (summary.feature_set == "combine_draft")].sort_values("roc_auc_mean").iloc[-1]
-        dlr = delong[(delong.population == "all_prospects") & (delong.feature_set_1 == "combine_draft_proj") & (delong.model == sp.model)]
-        if sp.roc_auc_mean > sb.roc_auc_mean and len(dlr) and dlr.p_value.iloc[0] < 0.05:
-            champ_fs = "combine_draft_proj"
+    # v2.1.0: the same rule applies to the drill-tracking set; the best qualifying candidate wins.
+    champ_fs, champ_auc = "combine_draft", -np.inf
+    sb = summary[(summary.population == "all_prospects") & (summary.feature_set == "combine_draft")].sort_values("roc_auc_mean").iloc[-1]
+    for cand in ("combine_draft_proj", "combine_draft_ct"):
+        if cand not in experiments["all_prospects"][1]:
+            continue
+        sp = summary[(summary.population == "all_prospects") & (summary.feature_set == cand)].sort_values("roc_auc_mean").iloc[-1]
+        dlr = delong[(delong.population == "all_prospects") & (delong.feature_set_1 == cand) & (delong.model == sp.model)]
+        if sp.roc_auc_mean > sb.roc_auc_mean and len(dlr) and dlr.p_value.iloc[0] < 0.05 and sp.roc_auc_mean > champ_auc:
+            champ_fs, champ_auc = cand, sp.roc_auc_mean
     registry = [("all_prospects", champ_fs, "champion", cfg["mlflow"]["classifier_name"]),
                 ("tracked_subset", "combine_draft_mov", "challenger", cfg["mlflow"]["classifier_name"] + "-movement")]
+    if "combine_draft_ct" in experiments["all_prospects"][1] and champ_fs != "combine_draft_ct":
+        registry.append(("all_prospects", "combine_draft_ct", "challenger", cfg["mlflow"]["classifier_name"] + "-combine-tracking"))
     if "onfield_subset" in experiments:
         registry.append(("onfield_subset", "combine_draft_perf", "challenger", cfg["mlflow"]["classifier_name"] + "-onfield"))
     finals = {}
@@ -598,13 +749,16 @@ def stage_stats(cfg: Config) -> None:
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description="CGMT pipeline")
     ap.add_argument("--config", default=None)
-    ap.add_argument("--stage", default="all", choices=["all", "data", "translation", "models", "stats", "figures", "relocate"])
+    ap.add_argument("--stage", default="all", choices=["all", "contract", "data", "translation", "models", "stats", "figures", "relocate"])
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     cfg = load_config(args.config)
     set_global_seed(cfg.seed)
     if args.stage == "relocate":
         log.info("relocate: %d MLflow store cells now point at this checkout", mlops.relocate_store(cfg))
+        return
+    if args.stage == "contract":
+        stage_contract(cfg)
         return
     mlops.setup(cfg)
     log.info("CGMT v%s seed=%d", __version__, cfg.seed)

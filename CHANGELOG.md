@@ -14,6 +14,73 @@ the report can be traced to the exact code and data that produced it.
 Versions 0.1.0–0.3.0 were development steps made before the repository was initialised
 (first commit = 0.4.0); they are recorded so the reasoning behind each decision is not lost.
 
+## [2.1.0] - 2026-10-16
+
+MINOR: the provider's data structure spec (`docs/Data_structure_CSV_files.docx`) becomes a
+machine-readable data contract that every run checks, and the pipeline is made conformant
+with the spec. **No number in `reports/metrics/` changes:** `data_version` stays
+`dfc567c4ffe3`, and the data and translation stages were re-run and diffed against the v2.0.0
+outputs: all 67 processed, interim and metric files are identical. The models were not retrained
+because their inputs and code path are unchanged, so the v2.0.0 MLflow runs and registry stand.
+`data_audit.json` gains keys, and `pp_rows_regular_season` goes from 240,412 to 239,673: R15 removes
+739 down-0 rows, none of which was a DL, OL or WR/TE family play.
+
+### Added
+- **Data contract** `configs/data_contract.yaml`: the spec's nine files. Per column it records type,
+  nullability, range, allowed values and pattern, plus keys, foreign keys, expected rows and
+  tracking coverage. It also documents how the pipeline handles each known deviation.
+- `cgmt.contract`: runs first in the data stage, also as `--stage contract` / `make validate`.
+  Writes `reports/metrics/data_contract_report.csv` (one row per check, with severity and handling)
+  and `data_contract_summary.json`. Errors (missing required file or column, duplicate key, broken
+  foreign key) stop the run. Deviations are warnings, handled by the business rules.
+- Result on the delivered files: 332 checks, **0 errors, 23 warnings**. `combine_tracking.csv` (spec File 3)
+  is missing. Tracking covers 2024-2025 Week 18 + playoffs only (no 2023; 279 of 510 prospects).
+  `player_play` has 2,141 fewer rows than the spec (-0.68%). Preseason games and playoff weeks
+  19-23 sit outside the spec's REG/POST and 1-18. There are 961 down-0 rows (two-point tries).
+  Four flags are stored as TRUE/FALSE where the spec documents 1.0/null. A few out-of-field
+  tracking positions and minor nulls in unused columns complete the list.
+- **`cgmt.combine_tracking`** (spec File 3, optional): business rule R16. Per-attempt metrics use the
+  same definitions as in-game tracking: 1 s / 2 s burst, top speed, time to 90% of top speed, peak
+  acceleration and braking, sharpest cut, tracking 10/20-yd splits, and plants and speed kept
+  through the turns of the 3-cone and shuttle. Player features (`ct_*`) take the best attempt, and
+  skill drills are z-scored within each drill name. When the file is present the pipeline adds:
+  tracking-vs-official validity (`ct_official_validity.csv`); drill tracking vs game movement and
+  on-field performance (`ct_translation_matrix.csv` and `ct_onfield_translation_matrix.csv`, kept
+  as separate files so the v2.0.0 FDR q-values do not move); athletic vs athletic + tracking
+  regressions on the same folds (`regression_ct_comparison.csv`, registered `<name>-ct@challenger`);
+  and the pre-draft classifier set `combine_draft_ct`. The champion rule extends to that set:
+  it replaces Combine + draft only with a higher mean AUC and DeLong p < 0.05. Tested end to end on
+  a simulated file. It is inactive on the delivered data.
+- 7 tests (`tests/test_contract.py`, 32 in total): contract severities, boolean encodings, file
+  resolution for spec names and split parts, R15 and spec alignment codes, and the 40-yd split
+  against kinematics, shuttle plants and best-attempt aggregation.
+
+### Changed
+- `raw_files` are names or glob patterns, so both the spec names (`game_tracking_2024.csv`,
+  `player_play.csv`, `combine_tracking.csv`) and the delivered split parts (`game_tracking_2024_2.csv`,
+  `player_play_3.csv`) are found. A part `<stem>_<n>.csv` is ignored when the full `<stem>.csv` is
+  present. File order in the manifest is unchanged, so `data_version` is unchanged.
+- Loader: an extra column is logged and ignored instead of stopping the run (the contract report
+  lists it), while a missing column is still an error. Tracking is streamed one file at a time:
+  rule R8b keeps `tracking_rules.season_types` (REG, POST; the spec's season files also hold
+  preseason). A play split across file parts is processed once, after all parts are read. Frames
+  are appended to `tracking_frames.parquet` and the figures read only the defensive-line frames
+  they plot. Together these keep spec-scale seasons within memory.
+- `performance.py`: the boolean parser accepts TRUE/FALSE, True/False, 1/0 and 1.0/0.0. Alignment
+  cells come from `performance_rules.alignment_codes`, which adds the spec's DE -> EDGE and
+  DT/NT -> INTERIOR_LINE (0 plays affected; OLB stays OTHER). New rule R15 (`valid_downs`) keeps
+  downs 1-4. OL pressures allowed over expected are computed only where `pressure_allowed` is
+  recorded (it was previously read as "no pressure"; 0 rows affected).
+- `within_group_spearman`: Benjamini-Hochberg runs over finite p-values only (a constant column
+  yields NaN instead of an error). The results are identical when every p-value is finite.
+
+### Considered and not adopted
+- Removing unblocked pressures from the DL pressure metric (spec: `unblocked_pressure`): the
+  reliability of pressure over expected fell from ICC 0.25 to 0.22, so the metric stays as it was.
+- Adding `cushion` and team coverage to the WR/TE separation expectation: WR ICC fell from 0.75 to
+  0.65. Cushion is the defender's response to the receiver (a post-treatment variable), so
+  conditioning on it removes part of the skill being measured.
+
 ## [2.0.0] - 2026-10-16
 
 MAJOR: a seventh raw file and new on-field targets. `data_version` changes, and the
