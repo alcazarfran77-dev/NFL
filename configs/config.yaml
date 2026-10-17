@@ -20,7 +20,8 @@ raw_files:                         # v2.1.0: names or glob patterns (docs/Data_s
   players: players.csv
   careers: player_career_successes.csv
   games: games.csv
-  tracking: "game_tracking_*.csv"    # spec: game_tracking_2023/2024/2025.csv; also split parts (_2024_2)
+  tracking: "game_tracking_*.csv"    # spec: game_tracking_2023/2024/2025.csv; delivered as parts (v3.0.0:
+                                     # _2023_5, _2024_1_5, _2024_2, _2025_2)
   player_play: "player_play*.csv"    # spec: player_play.csv; delivered as player_play_3.csv (v2.0.0)
   combine_tracking: "combine_tracking*.csv"   # spec File 3: Combine drill tracking (delivered as combine_tracking_6.csv, v2.2.0)
                                      # a part <stem>_<n>.csv is ignored when the full <stem>.csv is present
@@ -65,7 +66,7 @@ business_rules:
     bench_reps: [0, 50]
 
 tracking_rules:
-  season_types: [REG, POST]        # v2.1.0 R8b: spec files also hold preseason games (PRE excluded; none in the current parts)
+  season_types: [REG, POST]        # R8b: preseason excluded (v3.0.0: 98 preseason games, 390,373 frames)
   frame_rate_hz: 10
   snap_events: [ball_snap, snap_direct]
   min_post_snap_frames: 20         # need a full 2.0 s after the snap

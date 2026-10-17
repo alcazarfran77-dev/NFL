@@ -30,7 +30,7 @@ from . import __version__, combine_tracking, mlops
 from .cleaning import build_prospects, missingness_by_position
 from .config import Config, load_config, set_global_seed
 from .contract import load_contract, validate_all, write_report
-from .data import PRIMARY_KEYS, iter_tracking, load_raw, table_files, write_manifest
+from .data import PRIMARY_KEYS, SPREADSHEET_ROW_LIMIT, iter_tracking, load_raw, table_files, write_manifest
 from .features import (FEATURE_SETS, ATHLETIC, ATHLETIC_CT, CT_SET, classification_table, has_combine_tracking,
                        onfield_classification_table, onfield_regression_table, projector_table, regression_table, xy)
 from .models import nested_cv, refit_final
@@ -102,7 +102,8 @@ def stage_contract(cfg: Config) -> dict:
 def _process_tracking(cfg: Config, games: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     """Clean tracking and compute per-play metrics one file at a time (spec-scale seasons).
 
-    R8b keeps the season types in `tracking_rules.season_types`. A play whose frames are split
+    R8b keeps the season types in `tracking_rules.season_types`. R8c: a file with exactly 1,048,575 rows
+    was cut at a spreadsheet's row limit, so its last player-play is dropped. A play whose frames are split
     across file parts is set aside and processed once all parts are read. Frames are appended to
     data/interim/tracking_frames.parquet as they are cleaned. Output order = sorted play key,
     identical to processing the concatenated files.
@@ -133,7 +134,14 @@ def _process_tracking(cfg: Config, games: pd.DataFrame) -> tuple[pd.DataFrame, d
             writer = pq.ParquetWriter(out_path, table.schema)
         writer.write_table(table.cast(writer.schema))
 
+    audit["plays_dropped_cut_file"] = 0
     for name, df in iter_tracking(cfg):
+        if len(df) == SPREADSHEET_ROW_LIMIT:  # R8c: a file cut at the spreadsheet limit; its last play may be partial
+            last = df.iloc[-1][key]
+            cut = (df[key] == last.values).all(axis=1)
+            audit["plays_dropped_cut_file"] += 1
+            log.warning("%s has %d rows (spreadsheet limit): dropping its last player-play %s", name, len(df), tuple(last))
+            df = df[~cut]
         season_ok = df.game_id.isin(keep_games)
         audit["frames_excluded_season_type"] += int((~season_ok).sum())
         df = df[season_ok]

@@ -23,7 +23,7 @@ import pandas as pd
 import yaml
 
 from .config import PROJECT_ROOT, Config
-from .data import resolve_files
+from .data import SPREADSHEET_ROW_LIMIT, resolve_files
 
 TRUE_FALSE = {"TRUE", "FALSE", "T", "F", "1", "0", "1.0", "0.0"}
 
@@ -149,6 +149,9 @@ def validate_all(cfg: Config, contract: dict | None = None) -> tuple[pd.DataFram
         for p in paths:
             df = _read(p)
             rows += validate_frame(table, p.name, spec, df)
+            if len(df) == SPREADSHEET_ROW_LIMIT:
+                rows.append(_row(table, p.name, "*", "spreadsheet_row_limit", "warning", False, 1, 1,
+                                 f"exactly {SPREADSHEET_ROW_LIMIT:,} data rows: the file was probably cut by a spreadsheet"))
             keep = [c for c in set(sum([list(map(str.strip, k.split(","))) for k in spec.get("soft_foreign_keys", {})], []))
                     | set(spec.get("key", [])) | set(spec.get("foreign_keys", {})) | {"nfl_id", "game_id", "play_id", "event_id", "season", "season_type"}
                     if c in df.columns]

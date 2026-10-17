@@ -166,7 +166,7 @@ def fig_burst_distribution(cfg, plays, anomalies):
     med = plays.groupby("combine_position", observed=True).burst_2s.median()
     _title(fig, f"WRs cover {med['WR']:.1f} yd in the first 2 s, OL {med['OL']:.1f} yd; {int(plays.flag.sum())} plays flagged as outliers",
            "Per-play 2-second snap burst by position group; box = median and IQR, whiskers 1.5 IQR")
-    _save(fig, cfg, "fig03_burst_distribution.png", "game_tracking 2024-2025, Week 18 + playoffs, 2,677 player-plays")
+    _save(fig, cfg, "fig03_burst_distribution.png", f"game_tracking, regular season + playoffs, {len(plays):,} player-plays")
 
 
 def fig_speed_traces(cfg, frames, plays, profiles, prospects):
@@ -200,7 +200,7 @@ def fig_speed_traces(cfg, frames, plays, profiles, prospects):
     ax.set_xlim(0, 4)
     _title(fig, f"Two edge rushers: one peaks at {peaks['high']:.1f} yd/s inside 2 s, the other at {peaks['low']:.1f}",
            "Post-snap speed on every tracked play (thin) and the median trace (thick); highest vs lowest SBI among DE/OLB with 8+ plays")
-    _save(fig, cfg, "fig04_speed_traces.png", "game_tracking 2024-2025")
+    _save(fig, cfg, "fig04_speed_traces.png", "game_tracking, regular season + playoffs")
 
 
 def fig_estimator_bias(cfg, bias, sens):
@@ -268,7 +268,7 @@ def fig_translation_matrix(cfg, matrix):
            f"Within-position Spearman rho, Combine result vs in-game metric (* = FDR q < 0.05). Best for snap burst: {LABELS[best.x]} ({best.rho:+.2f})")
     fig.text(0.24, 0.07, "Blue = better test goes with more game movement; orange = the reverse. Body weight is shown as measured (heavier = more).",
              fontsize=8, color=INK2)
-    _save(fig, cfg, "fig07_translation_matrix.png", "combine_results + game_tracking, 221 players with 3+ plays")
+    _save(fig, cfg, "fig07_translation_matrix.png", f"combine_results + game_tracking, {int(matrix.n.max())} players with 3+ plays")
 
 
 def fig_sbi_vs_start(cfg, profiles, prospects, starter_assoc):
@@ -322,7 +322,7 @@ def fig_reliability(cfg, rel):
     dl = r.loc[("DL", "burst_2s"), "icc"]
     _title(fig, f"Snap burst is a player trait only on the defensive line (ICC {dl:.2f}); for WR and DB the play decides it",
            "Share of variance in player averages that is real player difference (ICC, method of moments); * = ANOVA p < 0.01; 'none' = not detectable")
-    _save(fig, cfg, "fig06_metric_reliability.png", "game_tracking, 221 players with 3+ plays")
+    _save(fig, cfg, "fig06_metric_reliability.png", f"game_tracking, {sum(n)} players with 3+ plays")
 
 
 def fig_dl_role(cfg, dl_tab):

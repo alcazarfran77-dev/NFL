@@ -113,6 +113,8 @@ PRIMARY_KEYS = {
     "combine_tracking": ["event_id", "entity_type", "time"],
 }
 OPTIONAL_TABLES = ("player_play", "combine_tracking")
+# Data rows of a CSV saved at a spreadsheet's row limit (1,048,576 incl. header): the file was probably cut.
+SPREADSHEET_ROW_LIMIT = 1_048_575
 _PART = re.compile(r"^(?P<stem>.+)_\d+$")
 
 

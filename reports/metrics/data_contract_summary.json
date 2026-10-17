@@ -16,6 +16,8 @@
       "player_play_3.csv"
     ],
     "tracking": [
+      "game_tracking_2023_5.csv",
+      "game_tracking_2024_1_5.csv",
       "game_tracking_2024_2.csv",
       "game_tracking_2025_2.csv"
     ],
@@ -28,23 +30,23 @@
   "coverage": {
     "tracking": {
       "seasons": [
+        2023,
         2024,
         2025
       ],
-      "missing_seasons": [
-        2023
-      ],
-      "games": 58,
+      "missing_seasons": [],
+      "games": 696,
       "games_by_type": {
-        "REG": 32,
-        "POST": 26
+        "REG": 559,
+        "PRE": 98,
+        "POST": 39
       },
-      "players": 279,
+      "players": 415,
       "expected_players": 510
     }
   },
-  "n_checks": 370,
+  "n_checks": 435,
   "n_errors": 0,
-  "n_warnings": 26,
+  "n_warnings": 32,
   "status": "pass_with_warnings"
 }
