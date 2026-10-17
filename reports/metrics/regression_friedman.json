@@ -1,49 +1,73 @@
 {
   "all_positions": {
     "rmse": {
-      "statistic": 26.28,
-      "p_value": 8.332873178195765e-06,
+      "statistic": 18.439999999999998,
+      "p_value": 0.0003568663041609603,
       "rank_1_is": "best",
       "mean_ranks": {
-        "position_mean": 2.6,
-        "ridge": 1.3333333333333333,
-        "random_forest": 2.3333333333333335,
-        "xgboost": 3.7333333333333334
+        "position_mean": 3.6,
+        "ridge": 2.466666666666667,
+        "random_forest": 1.6,
+        "xgboost": 2.3333333333333335
       }
     },
     "r2": {
-      "statistic": 26.28,
-      "p_value": 8.332873178195765e-06,
+      "statistic": 18.439999999999998,
+      "p_value": 0.0003568663041609603,
       "rank_1_is": "best",
       "mean_ranks": {
-        "position_mean": 2.6,
-        "ridge": 1.3333333333333333,
-        "random_forest": 2.3333333333333335,
-        "xgboost": 3.7333333333333334
+        "position_mean": 3.6,
+        "ridge": 2.466666666666667,
+        "random_forest": 1.6,
+        "xgboost": 2.3333333333333335
       }
     }
   },
   "defensive_line": {
     "rmse": {
-      "statistic": 13.480000000000018,
-      "p_value": 0.003705616881077968,
+      "statistic": 22.599999999999994,
+      "p_value": 4.892658384980545e-05,
       "rank_1_is": "best",
       "mean_ranks": {
-        "position_mean": 3.533333333333333,
-        "ridge": 2.2666666666666666,
-        "random_forest": 2.2666666666666666,
-        "xgboost": 1.9333333333333333
+        "position_mean": 3.8666666666666667,
+        "ridge": 2.1333333333333333,
+        "random_forest": 1.9333333333333333,
+        "xgboost": 2.066666666666667
       }
     },
     "r2": {
-      "statistic": 13.480000000000018,
-      "p_value": 0.003705616881077968,
+      "statistic": 22.599999999999994,
+      "p_value": 4.892658384980545e-05,
       "rank_1_is": "best",
       "mean_ranks": {
-        "position_mean": 3.533333333333333,
-        "ridge": 2.2666666666666666,
-        "random_forest": 2.2666666666666666,
-        "xgboost": 1.9333333333333333
+        "position_mean": 3.8666666666666667,
+        "ridge": 2.1333333333333333,
+        "random_forest": 1.9333333333333333,
+        "xgboost": 2.066666666666667
+      }
+    }
+  },
+  "wide_receivers": {
+    "rmse": {
+      "statistic": 12.680000000000007,
+      "p_value": 0.005382298641986653,
+      "rank_1_is": "best",
+      "mean_ranks": {
+        "position_mean": 3.0,
+        "ridge": 1.6,
+        "random_forest": 2.3333333333333335,
+        "xgboost": 3.066666666666667
+      }
+    },
+    "r2": {
+      "statistic": 12.680000000000007,
+      "p_value": 0.005382298641986653,
+      "rank_1_is": "best",
+      "mean_ranks": {
+        "position_mean": 3.0,
+        "ridge": 1.6,
+        "random_forest": 2.3333333333333335,
+        "xgboost": 3.066666666666667
       }
     }
   },
@@ -145,25 +169,49 @@
   },
   "defensive_line_ct": {
     "rmse": {
-      "statistic": 8.360000000000014,
-      "p_value": 0.03912900551959998,
+      "statistic": 24.439999999999998,
+      "p_value": 2.0216267412722592e-05,
       "rank_1_is": "best",
       "mean_ranks": {
-        "position_mean": 3.3333333333333335,
-        "ridge": 2.2666666666666666,
-        "random_forest": 2.2,
-        "xgboost": 2.2
+        "position_mean": 3.8666666666666667,
+        "ridge": 2.0,
+        "random_forest": 1.7333333333333334,
+        "xgboost": 2.4
       }
     },
     "r2": {
-      "statistic": 8.360000000000014,
-      "p_value": 0.03912900551959998,
+      "statistic": 24.439999999999998,
+      "p_value": 2.0216267412722592e-05,
       "rank_1_is": "best",
       "mean_ranks": {
-        "position_mean": 3.3333333333333335,
-        "ridge": 2.2666666666666666,
-        "random_forest": 2.2,
-        "xgboost": 2.2
+        "position_mean": 3.8666666666666667,
+        "ridge": 2.0,
+        "random_forest": 1.7333333333333334,
+        "xgboost": 2.4
+      }
+    }
+  },
+  "wide_receivers_ct": {
+    "rmse": {
+      "statistic": 13.159999999999997,
+      "p_value": 0.004303067353260639,
+      "rank_1_is": "best",
+      "mean_ranks": {
+        "position_mean": 3.066666666666667,
+        "ridge": 1.8,
+        "random_forest": 2.0,
+        "xgboost": 3.1333333333333333
+      }
+    },
+    "r2": {
+      "statistic": 13.159999999999997,
+      "p_value": 0.004303067353260639,
+      "rank_1_is": "best",
+      "mean_ranks": {
+        "position_mean": 3.066666666666667,
+        "ridge": 1.8,
+        "random_forest": 2.0,
+        "xgboost": 3.1333333333333333
       }
     }
   },

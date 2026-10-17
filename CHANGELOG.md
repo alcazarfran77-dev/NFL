@@ -14,6 +14,56 @@ the report can be traced to the exact code and data that produced it.
 Versions 0.1.0–0.3.0 were development steps made before the repository was initialised
 (first commit = 0.4.0); they are recorded so the reasoning behind each decision is not lost.
 
+## [3.0.0] - 2026-10-17
+
+MAJOR: full-season game tracking for 2023 and 2024 changes the Snap Burst Index sample. The SBI definition is
+unchanged, but every SBI-based number moves, so results are not comparable with v2.x. Everything that does not
+use game tracking reproduces v2.2.0 exactly: the on-field metrics and regressions, the all-prospect and on-field
+starter models, and the drill-tracking analyses. `data_version` is `a75ba51ae4b9` (ten raw files).
+
+### Added
+- **`game_tracking_2023_5.csv`** (333 games, 154 players) and **`game_tracking_2024_1_5.csv`** (305 games,
+  2024 weeks 0-17, 314 players). With the 2024/2025 Week 18 + playoff parts, the tracking has 24,828
+  regular-season and playoff player-plays and 299 players with 3+ plays. Before, it had 2,677 plays and 221
+  players, and the median per player rises from 8 plays to 39.
+- **R8c, a cut-file check.** `game_tracking_2023_5.csv` has exactly 1,048,575 data rows, the row limit of a
+  spreadsheet, so it was almost certainly cut when saved. Its rows are in no particular order, so the cut removes
+  a random set of plays (2023 still covers 154 of the 160 prospects in that class). The contract warns about
+  any file at that limit, and the pipeline drops the file's last player-play, which may be incomplete. R8b
+  removes the 98 preseason games (390,373 frames). Contract: 435 checks, 0 errors, 32 warnings.
+- **Wide receivers become an SBI population** (`regression.populations`, `cgmt-snap-burst-regressor-wr`), with a
+  drill-tracking challenger. SBI populations are a configured map (`SBI_POPULATIONS`).
+
+### Changed results (v2.2.0 -> v3.0.0)
+- Reliability of snap burst (ICC): DL 0.62 -> 0.63, **WR -0.34 -> 0.62**, OL 0.10 -> 0.40, DB 0.00 -> 0.26,
+  TE 0.24 -> 0.08 (21 players). With play context removed, WRs stay at 0.62 and the DL falls to 0.14. Most of
+  the DL's stability is role (edge vs interior); a receiver's burst is his own.
+- Drill vs game movement: 35 of 63 within-position cells pass FDR (25 before); 40 vs top speed rho 0.43.
+- **The defensive-line SBI model improves:** random forest RMSE 7.85 vs 9.99 for position alone (-21%; v2.2:
+  8.54 vs 10.05). Pooled R^2 is 0.37 [0.17, 0.50] (was 0.29 [-0.02, 0.45]), and the gain now passes the corrected
+  resampled t-test (p = 0.0002, Holm 0.001; v2.2 Holm p = 0.45).
+- Wide receivers (new): ridge RMSE 8.45 vs 9.38 (-10%), pooled R^2 0.22 [-0.01, 0.31]. The gain is consistent
+  fold by fold (Wilcoxon p = 0.03) but not significant under the corrected t-test (p = 0.30).
+- All positions: random forest RMSE 9.57 vs 10.06 (-5%), pooled R^2 0.07 [0.00, 0.12] (was -0.02).
+- The SBI is validated against season-long DL get-off at rho 0.45 (was 0.39, 69 DL vs 52) and against
+  pressure at 0.28 (was 0.49).
+- Starters: game movement still adds nothing beyond Combine + draft (299 players, AUC change -0.003 to 0.000,
+  DeLong p >= 0.47). The GLM odds ratio per 10 SBI points is 0.87 [0.61, 1.24], p = 0.45. The exploratory
+  Day-3 signal (rho 0.14 in v2.2) is gone (-0.03).
+- The 80th-percentile trap persists: it reads 0.50 yd low at 3 plays and correlates 0.12 with start rate, against
+  0.07 for the mean.
+- Drill tracking adds nothing to the SBI models (DL +0.004, WR -0.007 R^2; p >= 0.83).
+
+### Fixed
+- Figure titles that stated v2.2 conclusions as fixed text (figures 6, 10, 15) and source notes with typed counts
+  (figures 3, 4, 6, 7) are now computed from the data. Figure 14 lists linemen with 10+ tracked plays only.
+
+### Release notes
+- Trained from a clean MLflow store: 93 runs tagged `git_commit = aad6177`, `pipeline_version = 3.0.0` and
+  `data_version = a75ba51ae4b9`, with 17 registered models (two new: `cgmt-snap-burst-regressor-wr@champion`,
+  `-wr-ct@challenger`). Figure fixes were applied afterwards with `--stage figures`.
+- A first v3 run was interrupted by a workspace restart; it was discarded and the release was rerun from a clean store.
+
 ## [2.2.0] - 2026-10-16
 
 MINOR: the spec's Combine drill tracking arrives as `combine_tracking_6.csv` and enters the pipeline.

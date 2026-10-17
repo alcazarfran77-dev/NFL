@@ -1,4 +1,4 @@
-# CGMT — Combine-to-Game Movement Translation (v2.2.0)
+# CGMT — Combine-to-Game Movement Translation (v3.0.0)
 
 Do NFL Combine drills predict how a prospect moves and performs in regular-season
 games, and does that tell us who becomes a starter? This project answers it for one
@@ -24,12 +24,13 @@ The provider's data structure spec (`docs/Data_structure_CSV_files.docx`) is enc
 severity and the handling the pipeline applies. Errors (missing required file or column,
 duplicate key, broken foreign key) stop the run. Deviations are warnings, handled by business rules.
 
-Against the files delivered: **0 errors, 26 warnings** (370 checks). What differs from the spec:
+Against the files delivered: **0 errors, 32 warnings** (435 checks). What differs from the spec:
 
 | Spec | Delivered | Effect |
 |---|---|---|
 | `combine_tracking.csv`, 6,310 drill attempts | `combine_tracking_6.csv`: 6,310 attempts, 510 prospects (v2.2) | 40 lane outside the 0-53.3 yd frame; ball rows exceed player ranges and are dropped (R16) |
-| `game_tracking_2023/2024/2025.csv`, all 510 prospects | `game_tracking_2024_2.csv`, `_2025_2.csv`: Week 18 + playoffs, 279 prospects | SBI uses 221 players with 3+ plays; full files are read as is (split parts are ignored when the full file is present) |
+| `game_tracking_2023/2024/2025.csv`, full seasons, all 510 prospects | v3.0: `game_tracking_2023_5.csv` (2023 season), `_2024_1_5.csv` (2024 weeks 0-17), `_2024_2.csv` and `_2025_2.csv` (Week 18 + playoffs); no 2025 weeks 1-17 | 343 prospects tracked after R8b; the SBI uses 299 players with 3+ plays (24,828 player-plays). Split parts are ignored when the full file is present |
+| complete files | `game_tracking_2023_5.csv` has exactly 1,048,575 data rows, a spreadsheet's row limit | almost certainly cut when saved; R8c drops the file's last (possibly partial) player-play and the contract warns. The uncut file would add 2023 plays |
 | `player_play.csv`, 316,338 rows | `player_play_3.csv`, 314,197 rows (-0.68%) | results use the rows delivered |
 | games: REG/POST, weeks 1-18 | also PRE (147 games, weeks 0-3), playoffs weeks 19-23 | R10 on-field = REG; R8b tracking = REG + POST |
 | `down` 1-4 | 961 rows with down 0 (two-point tries) | R15 removes them (none was a family play) |
@@ -44,11 +45,30 @@ Against the files delivered: **0 errors, 26 warnings** (370 checks). What differ
 2. **The tracking reproduces the stopwatch.** Tracked 40 top speed vs official 40: rho -0.97.
 3. **It improves no model.** Position-drill top speed correlates +0.37 with DL get-off (q = 0.009). Within
    the DL it tracks the 40 (rho -0.76), and with weight, role and the 40 held fixed the link falls to +0.13
-   (p = 0.31). Same folds with and without drill tracking: R² change -0.004 for DL get-off and -0.03 to -0.09
-   elsewhere. Starter AUC is 0.915 -> 0.913 (DeLong p = 0.30). Champions are unchanged; the drill-tracking
-   models are registered as challengers.
+   (p = 0.31). Same folds with and without drill tracking: R² change +0.004 for DL snap burst, -0.007 for WR
+   snap burst (v3.0), -0.004 for DL get-off and -0.03 to -0.05 elsewhere. Starter AUC is 0.915 -> 0.913
+   (DeLong p = 0.30). Champions are unchanged; the drill-tracking models are registered as challengers.
 
-## Headline findings (v2.0)
+## Headline findings (v3.0, full-season game tracking)
+
+With the 2023 season and 2024 weeks 0-17 added, the median tracked player has 39 plays instead of 8.
+
+1. **Snap burst is a stable trait for defensive linemen and wide receivers.** ICC: DL 0.63, WR 0.62
+   (was -0.34 with Week 18 only), OL 0.40, DB 0.26. With play context removed WRs stay at 0.62 and the
+   DL falls to 0.14: a lineman's burst is mostly his role (edge vs interior), a receiver's is his own.
+2. **Combine now predicts DL snap burst significantly.** Random forest RMSE 7.85 vs 9.99 for position alone
+   (-21%), pooled out-of-fold R^2 0.37 [0.17, 0.50], corrected resampled t-test Holm p = 0.001 (v2.2: 0.45).
+   Wide receivers (new): ridge -10%, pooled R^2 0.22 [-0.01, 0.31], better in most folds (Wilcoxon p = 0.03)
+   but not significant under the corrected t-test (p = 0.30). All positions: -5%, R^2 0.07.
+3. **Sprint and jump drills carry into game movement; the NGS composite and bench press do not.** 35 of 63
+   within-position drill x movement cells pass FDR (25 in v2.2); the 40 vs in-game top speed rho 0.43.
+4. **Game movement adds nothing to predicting starters once draft capital is known.** Draft pick lifts ROC-AUC
+   from 0.84 to 0.91 (510 prospects); among 299 tracked players movement changes AUC by -0.003 to 0.000
+   (DeLong p >= 0.47); GLM odds ratio per 10 SBI points 0.87 [0.61, 1.24], p = 0.45.
+5. **A methods trap:** a metric built from a player's best plays (80th percentile) reads 0.50 yd low at 3
+   plays and correlates more with start rate than the unbiased mean (rho 0.12 vs 0.07).
+
+## On-field findings (v2.0, unchanged)
 
 1. **Drills forecast DL get-off, and get-off drives pressure.** Within the defensive line the
    vertical, 40, 10-yd split and broad jump correlate 0.36-0.43 with season-long get-off over
@@ -58,30 +78,10 @@ Against the files delivered: **0 errors, 26 warnings** (370 checks). What differ
    Pooled out-of-fold R^2 0.13 (get-off, random forest) and 0.19 (separation, ridge; size-led);
    DL pressure and OL protection do not beat position alone. OL protection tracks draft capital.
 3. **Season-long metrics are reliable traits** (ICC: get-off 0.89, WR separation 0.75, OL 0.74),
-   and the tracking SBI is a valid get-off proxy (rho 0.39 with season-long get-off, 0.49 with pressure).
+   and the tracking SBI is a valid get-off proxy (v3.0: rho 0.45 with season-long get-off for 69 DL, 0.28 with pressure).
 4. **On-field performance adds a little to starter prediction; projections add nothing.** Observed
    on-field performance +0.004 to +0.009 AUC (GLM OR 1.47 per SD beyond draft pick, p = 0.04);
    a stacked Combine -> on-field projector changes AUC by -0.002 to +0.0004.
-
-### Version 1 findings (all reproduced unchanged)
-
-1. **Check reliability before you trust a tracking metric.** Snap burst is a
-   stable player trait only on the defensive line (ICC 0.62). For WRs and DBs
-   no player differences are detectable from these plays: the play call decides
-   how far they move in 2 s. Peak acceleration is the most portable trait.
-2. **Sprint and jump drills carry into game movement; the NGS athleticism
-   composite and bench press do not.** Within position, the 40, 10-yd split and
-   broad jump correlate 0.2–0.35 with in-game burst, acceleration and top speed
-   (FDR q < 0.05). On the DL about half of that link is role (edge vs interior).
-3. **Combine predicts snap burst only where it is a trait.** On the defensive line
-   XGBoost cuts RMSE from 10.05 to 8.54 SBI points (pooled R^2 0.29); across all
-   positions no model beats position alone by a useful margin.
-4. **Game movement adds nothing to predicting starters once draft capital is known.**
-   Draft pick lifts ROC-AUC from 0.84 to 0.91 (p < 0.003); game movement then adds
-   -0.005 to 0 (corrected t p >= 0.66, DeLong p >= 0.18).
-5. **A methods trap:** building a player's metric from his best plays (80th
-   percentile) biases low-exposure players down and manufactures a link between
-   movement and playing time (rho 0.23 vs 0.08 with an unbiased mean).
 
 ## Layout
 
@@ -90,7 +90,7 @@ configs/config.yaml        single source of truth: paths, business rules, CV, gr
 configs/smoke.yaml         same pipeline on tiny CV/grids (CI)
 configs/data_contract.yaml the provider's data structure spec as a checked contract (v2.1)
 docs/                      Data_structure_CSV_files.docx (the spec)
-data/raw/                  the eight input CSVs (not in git; hashed in data/manifest.json)
+data/raw/                  the ten input CSVs (not in git; hashed in data/manifest.json)
 data/processed/            prospects, tracking play metrics, movement profiles, on-field plays + profiles (parquet)
 src/cgmt/
   contract.py              data-contract validation and report (v2.1)
@@ -119,7 +119,7 @@ make relocate                                 # once, after extracting the archi
 make validate                                 # data contract only, ~10 s
 make test                                     # 34 unit tests, ~5 s
 make smoke                                    # whole pipeline on tiny grids, ~5 min (own output folders)
-make all                                      # release run, ~60 min on 2 cores
+make all                                      # release run, ~90 min on 2 cores
 make ui                                       # MLflow UI: runs + registry
 ```
 
@@ -153,8 +153,9 @@ clf = mlflow.sklearn.load_model("models:/cgmt-starter-classifier@champion")
 
 - Combine drills are measured two ways: official results (times, distances) and, since v2.2, 10 Hz drill
   tracking (`combine_tracking_6.csv`). Only tracking metrics that repeat within a player are used.
-- Tracking covers Week 18 and the playoffs of the 2024 and 2025 seasons, with 1–4
-  tracked players per play and no ball or opponents, so the SBI uses individual kinematics.
+- Game tracking (v3.0) covers the 2023 season, 2024 weeks 0-17, and Week 18 + playoffs of 2024 and 2025
+  (2025 weeks 1-17 were not delivered). Preseason games are removed (R8b). There are 1-4 tracked players
+  per play and no ball or opponents, so the SBI uses individual kinematics.
 - `player_play` (v2.0) covers every game of 2023-2025 for 497 prospects; the on-field metrics
   use regular-season, non-nullified plays on downs 1-4 only (239,673 rows). DBs get no on-field metric (the
   file has no coverage outcome). "Expected" is the average of prospect plays in the same context.

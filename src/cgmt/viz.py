@@ -319,8 +319,11 @@ def fig_reliability(cfg, rel):
     ax.tick_params(length=0)
     for s_ in ax.spines.values():
         s_.set_visible(False)
-    dl = r.loc[("DL", "burst_2s"), "icc"]
-    _title(fig, f"Snap burst is a player trait only on the defensive line (ICC {dl:.2f}); for WR and DB the play decides it",
+    b = {p: r.loc[(p, "burst_2s"), "icc"] for p in POS_ORDER}
+    stable = [p for p in POS_ORDER if b[p] >= 0.5]
+    weak = [p for p in POS_ORDER if b[p] < 0.5]
+    _title(fig, f"Snap burst is a stable player trait for {' and '.join(f'{p} ({b[p]:.2f})' for p in stable)}; "
+                f"weaker for {', '.join(weak)}" if stable else "Snap burst is not a stable player trait at any position",
            "Share of variance in player averages that is real player difference (ICC, method of moments); * = ANOVA p < 0.01; 'none' = not detectable")
     _save(fig, cfg, "fig06_metric_reliability.png", f"game_tracking, {sum(n)} players with 3+ plays")
 
@@ -376,10 +379,12 @@ def fig_regression_cv(cfg, m_dir, summary):
         ax.set_title(f"{chr(65 + k)}. {titles[pop]} (n = {int(s.n.iloc[0])})")
         ax.set_xlim(-0.5, len(order) - 0.2)
         ax.set_ylim(-0.8, 0.9)
-    axes[0].set_ylabel("Outer-fold R² of the Snap Burst Index (axis clipped at -0.8)")
-    short = {"all_positions": "all positions", "defensive_line": "DL", "wide_receivers": "WR"}
-    parts = [f"{short[p]} {best[p].r2_mean:+.2f}" for p in pops]
-    _title(fig, "Combine results predict snap burst within a position: R² " + ", ".join(parts),
+    axes[0].set_ylabel("Outer-fold R² of the SBI (clipped at -0.8)")
+    short = {"all_positions": "all positions", "defensive_line": "DL", "wide_receivers": "WRs"}
+    cut = {p: 1 - best[p].rmse_mean / summary[(summary.population == p) & (summary.model == "position_mean")].rmse_mean.iloc[0]
+           for p in pops}
+    _title(fig, "Combine results cut snap-burst error vs position alone by " +
+           ", ".join(f"{cut[p]:.0%} ({short[p]})" for p in sorted(pops, key=lambda p: -cut[p])),
            "Nested CV, 5 folds x 3 repeats; dots = outer folds, marker = mean with 95% CI; blue = lowest-RMSE learned model")
     _save(fig, cfg, "fig10_regression_cv.png", "Snap Burst Index from Combine measurables and drills")
 
@@ -484,7 +489,7 @@ def fig_importance(cfg, imp_clf, imp_reg, champ_clf_model, reg_champ, reg_pop="d
 
 
 def fig_translation_gap(cfg, gap):
-    g = gap[gap.population == "defensive_line"].dropna(subset=["translation_gap"]).sort_values("translation_gap")
+    g = gap[(gap.population == "defensive_line") & (gap.n_plays >= 10)].dropna(subset=["translation_gap"]).sort_values("translation_gap")
     pick = pd.concat([g.head(6), g.tail(6)])
     fig, ax = plt.subplots(figsize=(9.5, 6.4))
     fig.subplots_adjust(left=0.3, right=0.95, top=0.85, bottom=0.1)
@@ -502,7 +507,7 @@ def fig_translation_gap(cfg, gap):
     ax.text(lim * 0.97, len(pick) - 0.4, "Plays faster than he tested", ha="right", fontsize=8.5, color=ACCENT, fontweight="bold")
     ax.text(-lim * 0.97, len(pick) - 0.4, "Tested faster than he plays", ha="left", fontsize=8.5, color=ORANGE, fontweight="bold")
     _title(fig, "Defensive linemen whose get-off departs most from what their testing predicted",
-           "Six largest positive and negative translation gaps; labels = game SBI vs Combine-predicted SBI (out-of-fold)")
+           "Six largest positive and negative gaps among linemen with 10+ tracked plays; labels = game SBI vs Combine-predicted SBI (out-of-fold)")
     _save(fig, cfg, "fig14_translation_gap.png", "nested-CV out-of-fold predictions of the champion regressor")
 
 
@@ -537,7 +542,9 @@ def fig_onfield_reliability(cfg, rel, track_rel, stab):
     a2.set_xlabel("Spearman rho, rookie vs later seasons")
     a2.set_title("B. Rookie year vs later seasons", fontsize=9.5)
     g = rel.set_index(["metric", "combine_position"]).icc
-    _title(fig, f"Season-long on-field metrics are stable traits (DL get-off ICC {g[('goe', 'DL')]:.2f}); 2-s tracking burst mostly is not",
+    tr = [r.combine_position for r in tb.itertuples() if r.icc >= 0.5]
+    _title(fig, f"Season-long on-field metrics are stable traits (DL get-off ICC {g[('goe', 'DL')]:.2f}); "
+                f"2-s tracking burst is one for {' and '.join(tr) if tr else 'no position'}",
            "ICC by method of moments among players meeting the play minimum; panel B: 2023-2024 classes, blue = p < 0.05")
     _save(fig, cfg, "fig15_onfield_reliability.png", "player_play regular season 2023-2025 + game_tracking")
 

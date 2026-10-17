@@ -40,23 +40,23 @@
     }
   },
   "tracked_subset/combine_draft": {
-    "statistic": 1.0508474576271167,
-    "p_value": 0.5913047584123494,
+    "statistic": 1.0689655172413774,
+    "p_value": 0.5859723008943418,
     "rank_1_is": "best",
     "mean_ranks": {
-      "logistic_regression": 2.033333333333333,
-      "random_forest": 2.1666666666666665,
-      "xgboost": 1.8
+      "logistic_regression": 1.8333333333333333,
+      "random_forest": 2.2,
+      "xgboost": 1.9666666666666666
     }
   },
   "tracked_subset/combine_draft_mov": {
-    "statistic": 3.15254237288135,
-    "p_value": 0.20674457466952084,
+    "statistic": 1.3220338983050963,
+    "p_value": 0.5163259901346193,
     "rank_1_is": "best",
     "mean_ranks": {
-      "logistic_regression": 2.1333333333333333,
-      "random_forest": 2.2333333333333334,
-      "xgboost": 1.6333333333333333
+      "logistic_regression": 2.066666666666667,
+      "random_forest": 2.1666666666666665,
+      "xgboost": 1.7666666666666666
     }
   },
   "onfield_subset/combine_draft": {
