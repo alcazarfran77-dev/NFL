@@ -514,6 +514,21 @@ def _regress(cfg: Config, pop: str, df: pd.DataFrame, target: str, strata: pd.Se
                          **({} if feature_set == "athletic" else {"feature_set": feature_set, "alias": alias})}}
 
 
+# Snap-burst populations: name -> (Combine position or None for all, registry suffix).
+# v3.0.0 adds wide receivers: with full-season tracking their snap burst is a stable trait (ICC 0.62).
+SBI_POPULATIONS = {"all_positions": (None, ""), "defensive_line": ("DL", "-dl"), "wide_receivers": ("WR", "-wr")}
+
+
+def _sbi_population(full: pd.DataFrame, pop: str, k: int) -> tuple[pd.DataFrame, pd.Series, str]:
+    """Rows, CV strata and registry suffix for one SBI population."""
+    pos, suffix = SBI_POPULATIONS[pop]
+    if pos is None:
+        return full, full["combine_position"].astype(str), suffix
+    df = full[full.combine_position.astype(str) == pos]
+    strata = df["dl_role"] if pos == "DL" else _strata(_role(df["nfl_position"]), k)
+    return df, strata, suffix
+
+
 def stage_regression(cfg: Config, d: dict) -> dict:
     """Combine -> Snap Burst Index (v1) and Combine -> on-field performance (v2.0.0).
 
@@ -528,9 +543,8 @@ def stage_regression(cfg: Config, d: dict) -> dict:
     full = regression_table(d["prospects"], d["profiles"], target)
     full["dl_role"] = _role(full["nfl_position"])
     for pop in cfg["regression"]["populations"]:
-        df = full if pop == "all_positions" else full[full.combine_position == "DL"]
-        strata = df["combine_position"].astype(str) if pop == "all_positions" else df["dl_role"]
-        reg_name = cfg["mlflow"]["regressor_name"] + ("" if pop == "all_positions" else "-dl")
+        df, strata, suffix = _sbi_population(full, pop, k)
+        reg_name = cfg["mlflow"]["regressor_name"] + suffix
         runs.append(_regress(cfg, pop, df, target, strata, reg_name,
                              gap_cols + ["dl_role", "burst_2s_eb", "sbi_reliability", "n_plays"], {"family": "sbi"}))
 
@@ -549,10 +563,10 @@ def stage_regression(cfg: Config, d: dict) -> dict:
         for base in list(runs):
             pop = base["summary"].population.iloc[0]
             if pop == "all_positions":
-                continue  # SBI is a trait only on the DL (v0.9.0); the all-position target is noise elsewhere
-            if pop == "defensive_line":
-                df = full[full.combine_position == "DL"]
-                strata, tgt = df["dl_role"], target
+                continue  # the drill-tracking comparison runs where snap burst is a trait (single-position populations)
+            if pop in SBI_POPULATIONS:
+                df, strata, _ = _sbi_population(full, pop, k)
+                tgt = target
             else:
                 task = next(t for t in cfg["regression"]["onfield_tasks"] if t["name"] == pop)
                 df = onfield_regression_table(d["prospects"], d["onfield"], task["target"], task["positions"])

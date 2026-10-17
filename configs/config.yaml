@@ -124,7 +124,8 @@ cv:
   bootstrap_resamples: 2000
 
 regression:
-  populations: [all_positions, defensive_line]   # defensive_line = where snap burst is a reliable trait
+  populations: [all_positions, defensive_line, wide_receivers]   # single positions = where snap burst is a reliable
+                                   # trait (v3.0.0: DL ICC 0.63, WR 0.62 with full-season tracking)
   target: sbi                      # Snap Burst Index: within-position z of shrunk 2-s burst (50 +/- 10)
   combine_tracking_comparison: true   # v2.1.0: athletic vs athletic + drill tracking (only with combine_tracking.csv)
   onfield_tasks:                   # v2.0.0: Combine -> on-field performance (shrunk, over expected)

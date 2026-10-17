@@ -131,6 +131,7 @@ regression:
   populations:
   - all_positions
   - defensive_line
+  - wide_receivers
   target: sbi
   onfield_tasks:
   - name: dl_getoff

@@ -352,12 +352,14 @@ def fig_dl_role(cfg, dl_tab):
 # ----------------------------------------------------------------------------- results
 def fig_regression_cv(cfg, m_dir, summary):
     order = ["position_mean", "ridge", "random_forest", "xgboost"]
-    pops = [("all_positions", "A. All positions (n = {n})"), ("defensive_line", "B. Defensive line only (n = {n})")]
-    fig, axes = plt.subplots(1, 2, figsize=(11, 4.6), sharey=False)
-    fig.subplots_adjust(left=0.07, right=0.98, top=0.78, bottom=0.17, wspace=0.22)
+    titles = {"all_positions": "All positions", "defensive_line": "Defensive line", "wide_receivers": "Wide receivers"}
+    pops = [p for p in titles if p in set(summary.population)]
+    fig, axes = plt.subplots(1, len(pops), figsize=(5.4 * len(pops), 4.6), sharey=True)
+    axes = np.atleast_1d(axes)
+    fig.subplots_adjust(left=0.06, right=0.98, top=0.78, bottom=0.17, wspace=0.12)
     rng = np.random.default_rng(cfg.seed)
     best = {}
-    for ax, (pop, title) in zip(axes, pops):
+    for k, (ax, pop) in enumerate(zip(axes, pops)):
         folds = pd.read_csv(m_dir / f"regression_fold_{pop}_r2.csv")
         s = summary[summary.population == pop]
         champ = s[s.model != "position_mean"].sort_values("rmse_mean").iloc[0].model
@@ -371,11 +373,13 @@ def fig_regression_cv(cfg, m_dir, summary):
             ax.text(i + 0.38, mu, f"{mu:+.2f}", va="center", fontsize=8.5, color=col)
         ax.axhline(0, color=INK2, linewidth=0.8)
         ax.set_xticks(range(len(order)), [LABELS[m] for m in order], fontsize=8.5)
-        ax.set_title(title.format(n=int(s.n.iloc[0])))
+        ax.set_title(f"{chr(65 + k)}. {titles[pop]} (n = {int(s.n.iloc[0])})")
         ax.set_xlim(-0.5, len(order) - 0.2)
-    axes[0].set_ylabel("Out-of-fold R² of the Snap Burst Index")
-    a, b = best["all_positions"], best["defensive_line"]
-    _title(fig, f"Combine results predict snap burst only where it is a trait: R² {b.r2_mean:+.2f} on the DL vs {a.r2_mean:+.2f} for all positions",
+        ax.set_ylim(-0.8, 0.9)
+    axes[0].set_ylabel("Outer-fold R² of the Snap Burst Index (axis clipped at -0.8)")
+    short = {"all_positions": "all positions", "defensive_line": "DL", "wide_receivers": "WR"}
+    parts = [f"{short[p]} {best[p].r2_mean:+.2f}" for p in pops]
+    _title(fig, "Combine results predict snap burst within a position: R² " + ", ".join(parts),
            "Nested CV, 5 folds x 3 repeats; dots = outer folds, marker = mean with 95% CI; blue = lowest-RMSE learned model")
     _save(fig, cfg, "fig10_regression_cv.png", "Snap Burst Index from Combine measurables and drills")
 
@@ -699,7 +703,7 @@ def _ci_from_t(mean_diff, t, df, level=0.95):
 def fig_ct_value(cfg, m_dir, clf_tests, n_folds):
     """Does drill tracking improve out-of-sample prediction? Same rows and folds, with vs without."""
     bvb = pd.read_csv(m_dir / "ct_best_vs_best.csv")
-    names = {"defensive_line": "DL snap burst (SBI)", "dl_getoff": "DL get-off over expected",
+    names = {"defensive_line": "DL snap burst (SBI)", "wide_receivers": "WR snap burst (SBI)", "dl_getoff": "DL get-off over expected",
              "dl_pressure": "DL pressure over expected", "ol_protection": "OL protection over expected",
              "wrte_separation": "WR/TE separation over expected"}
     r1 = pd.DataFrame([{"label": f"{names[r.task]}\n{LABELS[r.model_without]} -> {LABELS[r.model_with]}",
