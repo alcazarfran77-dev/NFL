@@ -115,14 +115,14 @@ manejan las reglas de negocio. Con los archivos entregados: **435 revisiones, 0 
 
 ### Opción 1: Google Colab
 
-1. Suba este repositorio a GitHub (ver [Publicar en GitHub](#publicar-en-github)).
-2. Abra `fuentes/entrena.ipynb` en Colab: en colab.research.google.com elija *Archivo → Abrir cuaderno →
-   GitHub* y pegue la URL del repositorio, o use el enlace
-   `https://colab.research.google.com/github/<usuario>/NFL/blob/main/fuentes/entrena.ipynb`.
-3. En la primera celda escriba la URL del repositorio en `REPO_URL` y elija `MODO = "rapida"` (unos 10 min,
-   rejillas mínimas, salidas en carpetas propias) o `MODO = "completa"` (la corrida de entrega, de 60 a 90 min
-   en los 2 núcleos de Colab).
-4. Ejecute todo (*Entorno de ejecución → Ejecutar todas*). El notebook clona el repositorio, instala las
+[![Abrir en Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alcazarfran77-dev/NFL/blob/main/fuentes/entrena.ipynb)
+
+1. Abra el notebook con el botón de arriba (o en colab.research.google.com: *Archivo → Abrir cuaderno →
+   GitHub* y pegue `alcazarfran77-dev/NFL`).
+2. En la primera celda, `REPO_URL` ya apunta a este repositorio; elija `MODO = "rapida"` (unos 10 min,
+   rejillas mínimas, salidas en carpetas propias), `MODO = "completa"` (la corrida de entrega, de 60 a 90 min
+   en los 2 núcleos de Colab) o `MODO = "solo_cargar"` (muestra los resultados y carga los modelos, 1–2 min).
+3. Ejecute todo (*Entorno de ejecución → Ejecutar todas*). El notebook clona el repositorio, instala las
    dependencias, valida los datos, prepara los datos limpios, entrena y evalúa, muestra las tablas y figuras, y
    carga los modelos registrados.
 
@@ -134,7 +134,7 @@ vienen en `mlflow/`.
 Requiere Python 3.13 (las versiones están fijadas en `requirements.txt`) y `make`.
 
 ```bash
-git clone https://github.com/<usuario>/NFL.git && cd NFL
+git clone https://github.com/alcazarfran77-dev/NFL.git && cd NFL
 python -m pip install -r requirements.txt
 make reubicar     # una vez tras clonar: apunta las rutas del almacén MLflow a esta carpeta
 make verificar    # hashes de los datos originales vs el manifiesto, unos 5 s
@@ -262,14 +262,15 @@ en la sección 10 del [reporte](CHANGELOG.md#10-conclusiones-accionables).
 - Los backs defensivos no tienen métrica de campo: `player_play` no trae resultados de cobertura.
 - "Lo esperado" se calcula con las jugadas de los propios prospectos, no con las de toda la liga.
 
-## Publicar en GitHub
+## Repositorio en GitHub
 
-El repositorio ya tiene su historial de git y sus etiquetas de versión. Cree un repositorio vacío en GitHub
-(sin README ni licencia) y súbalo:
+El proyecto está publicado en https://github.com/alcazarfran77-dev/NFL con todo su historial. Para subir
+cambios desde una copia local:
 
 ```bash
-git remote add origin https://github.com/<usuario>/NFL.git
-git push -u origin main --tags
+git add -A
+git commit -m "descripción del cambio"
+git push
 ```
 
 Ningún archivo supera el límite de 100 MB de GitHub; el más grande es `player_play_3.csv.gz` con 41 MB, y en
