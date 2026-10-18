@@ -372,8 +372,8 @@ se registran para conservar el razonamiento.
 | 0.1.0 | Lectores validados por esquema, manifiesto de datos | — |
 
 **Corridas de entrega.** Cada versión mayor o menor se entrenó desde un almacén MLflow limpio. La versión 3.1
-se volvió a entrenar completa desde cero con el código reorganizado: {{N_RUNS}} corridas etiquetadas
-`git_commit = {{COMMIT}}`, `pipeline_version = 3.1.0` y `data_version = a75ba51ae4b9`, con 17 modelos
+se volvió a entrenar completa desde cero con el código reorganizado: 93 corridas etiquetadas
+`git_commit = 71749c7`, `pipeline_version = 3.1.0` y `data_version = a75ba51ae4b9`, con 17 modelos
 registrados. Todas las métricas coinciden con las de v3.0.0 (93 corridas en el commit `aad6177`); las únicas
 diferencias son los textos de las figuras, ahora en español. Las versiones anteriores quedan documentadas en
 la parte II.
@@ -1092,7 +1092,7 @@ make validar      # solo el contrato de datos: originales vs especificación, un
 make verificar    # hashes de los datos originales vs el manifiesto
 make pruebas      # 35 pruebas unitarias, unos 5 s
 make rapida       # todo el flujo con CV y rejillas mínimas, unos 10 min (carpetas propias)
-make todo         # corrida de entrega, unos 90 min en 2 núcleos
+make todo         # corrida de entrega, unos 60 min en 2 núcleos
 make ui           # interfaz de MLflow: corridas, métricas, modelos registrados
 ```
 
@@ -1145,7 +1145,7 @@ reorganizado (ver notas de la entrega).
   - `fuentes/train.py`: entrenamiento, evaluación, pruebas estadísticas, figuras y registro en MLflow.
   - `README.md` (guía de reproducción y decisiones) y `CHANGELOG.md` (reporte final más este historial).
   - Complementos: `configuracion/`, `pruebas/`, `reportes/` (figuras y métricas), `documentos/` (especificación de datos y tarjeta del modelo), `mlflow/` (almacén de experimentos y registro), `.github/workflows/`, `requirements.txt`, `pyproject.toml` y `Makefile`.
-- **Notebook `fuentes/entrena.ipynb`**: clona el repositorio en Colab, instala las dependencias, valida el contrato de datos, prepara los datos, entrena en modo rápido (unos 10 min) o completo (unos 90 min), muestra las tablas y figuras de evaluación y carga los modelos registrados desde MLflow.
+- **Notebook `fuentes/entrena.ipynb`**: clona el repositorio en Colab, instala las dependencias, valida el contrato de datos, prepara los datos, entrena en modo rápido (unos 10 min) o completo (60–90 min), muestra las tablas y figuras de evaluación y carga los modelos registrados desde MLflow.
 - **Datos originales comprimidos** (`.csv.gz`, `gzip -n -9`): `player_play_3.csv` pesa 147 MB sin comprimir y GitHub rechaza archivos de más de 100 MB. Los diez archivos pasan de 427 MB a 100 MB. pandas los lee sin descomprimir a disco, y el manifiesto guarda el SHA-256 y las líneas del contenido descomprimido, así `data_version` no cambia (`a75ba51ae4b9`). El lector acepta `.csv` y `.csv.gz` como el mismo archivo lógico, de modo que una entrega nueva sin comprimir funciona igual.
 - `--etapa verificar` (`make verificar`): vuelve a calcular los hashes de `datos/datos_ini` contra el manifiesto; la CI falla ante cualquier diferencia.
 - Una prueba nueva (`test_csv_comprimido_equivale_al_original`): un CSV comprimido da la misma tabla, el mismo hash y el mismo número de filas que el original. 35 pruebas en total.
@@ -1175,11 +1175,14 @@ reorganizado (ver notas de la entrega).
 | `make test`, `smoke`, `validate`, `all`, `relocate` | `make pruebas`, `rapida`, `validar`, `todo`, `reubicar` |
 
 ### Notas de la entrega
-- Entrenado desde un almacén MLflow limpio: {{N_RUNS}} corridas etiquetadas `git_commit = {{COMMIT}}`,
+- Entrenado desde un almacén MLflow limpio: 93 corridas etiquetadas `git_commit = 71749c7`,
   `pipeline_version = 3.1.0` y `data_version = a75ba51ae4b9`, con 17 modelos registrados (los mismos nombres y
   alias que en v3.0.0).
 - Verificado: la etapa de datos reproduce byte por byte cada archivo de `datos/datos_limp/` de v3.0.0; el
-  contrato da 435 revisiones, 0 errores y 32 advertencias, igual que antes; {{VERIFICACION}}
+  contrato da 435 revisiones, 0 errores y 32 advertencias, igual que antes; las 90 tablas de `reportes/metricas/` coinciden número por número con las de v3.0.0 (solo
+  cambian textos traducidos, los nombres `.csv.gz` del reporte del contrato y la fecha del resumen del GLM);
+  pasan las 35 pruebas, y el notebook corre de punta a punta en modo rápido en unos 10 minutos. La corrida
+  completa tardó 59 minutos en 2 núcleos.
 
 ## [3.0.0] - 2026-10-17
 

@@ -120,8 +120,8 @@ manejan las reglas de negocio. Con los archivos entregados: **435 revisiones, 0 
    GitHub* y pegue la URL del repositorio, o use el enlace
    `https://colab.research.google.com/github/<usuario>/NFL/blob/main/fuentes/entrena.ipynb`.
 3. En la primera celda escriba la URL del repositorio en `REPO_URL` y elija `MODO = "rapida"` (unos 10 min,
-   rejillas mínimas, salidas en carpetas propias) o `MODO = "completa"` (la corrida de entrega, unos 90 min en
-   los 2 núcleos de Colab).
+   rejillas mínimas, salidas en carpetas propias) o `MODO = "completa"` (la corrida de entrega, de 60 a 90 min
+   en los 2 núcleos de Colab).
 4. Ejecute todo (*Entorno de ejecución → Ejecutar todas*). El notebook clona el repositorio, instala las
    dependencias, valida los datos, prepara los datos limpios, entrena y evalúa, muestra las tablas y figuras, y
    carga los modelos registrados.
@@ -141,7 +141,7 @@ make verificar    # hashes de los datos originales vs el manifiesto, unos 5 s
 make validar      # solo el contrato de datos, unos 10 s
 make pruebas      # 35 pruebas unitarias, unos 5 s
 make rapida       # todo el flujo con rejillas mínimas, unos 10 min (carpetas propias, no toca la entrega)
-make todo         # corrida de entrega: datos, traducción, modelos, estadística y figuras, unos 90 min
+make todo         # corrida de entrega: datos, traducción, modelos, estadística y figuras, unos 60 min
 make ui           # interfaz de MLflow: corridas, métricas y modelos registrados
 ```
 
@@ -269,7 +269,7 @@ git remote add origin https://github.com/<usuario>/NFL.git
 git push -u origin main --tags
 ```
 
-Ningún archivo supera el límite de 100 MB de GitHub; el más grande es `player_play_3.csv.gz` con 41 MB, y el
-repositorio completo ocupa unos 160 MB. Si el repositorio va a ser público, confirme antes que puede publicar
+Ningún archivo supera el límite de 100 MB de GitHub; el más grande es `player_play_3.csv.gz` con 41 MB, y en
+GitHub el repositorio ocupa unos 160 MB. Si el repositorio va a ser público, confirme antes que puede publicar
 los datos del proveedor; si no, quítelos del control de versiones (`git rm -r --cached datos/datos_ini`) y
 compártalos por otro medio: el flujo los encuentra igual al copiarlos en `datos/datos_ini/`.

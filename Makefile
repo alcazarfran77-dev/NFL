@@ -34,7 +34,7 @@ estadistica:        ## recalcula las pruebas ómnibus desde los puntajes por pli
 figuras:            ## regenera reportes/figuras desde las métricas guardadas
 	$(PY) fuentes/train.py --etapa figuras
 
-todo:               ## corrida completa reproducible (~90 min en 2 núcleos)
+todo:               ## corrida completa reproducible (~60 min en 2 núcleos)
 	$(PY) fuentes/train.py --etapa todo
 
 reubicar:           ## una vez tras clonar o extraer: apunta las rutas del almacén MLflow a esta carpeta

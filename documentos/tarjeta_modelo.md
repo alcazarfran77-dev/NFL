@@ -2,7 +2,7 @@
 
 Corrida de entrega: almacén MLflow limpio `mlflow/mlflow.db`, experimento `cgmt-combine-translation`,
 `data_version = a75ba51ae4b9` (diez archivos originales, con tracking de partido de temporada completa de 2023
-y 2024), semilla 42, {{N_RUNS}} corridas en el commit `{{COMMIT}}`, 17 modelos registrados. Todos los puntajes
+y 2024), semilla 42, 93 corridas en el commit `71749c7`, 17 modelos registrados. Todos los puntajes
 son fuera de muestra con validación cruzada anidada (5 pliegues × 3 repeticiones) salvo que se indique otra
 cosa. La versión 3.1.0 reorganiza el repositorio y traduce la documentación; los modelos se volvieron a
 entrenar con el código reorganizado y reproducen los de v3.0.0.
