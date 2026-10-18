@@ -156,6 +156,9 @@ Cada etapa también corre sola, en este orden:
 | estadística | `make estadistica` | Vuelve a calcular las pruebas ómnibus desde los puntajes por pliegue, sin reentrenar | `reportes/metricas/` |
 | figuras | `make figuras` | Dibuja las 21 figuras desde las métricas guardadas | `reportes/figuras/` |
 
+`make reubicar` reescribe las rutas guardadas dentro de `mlflow/mlflow.db`, así que git mostrará ese archivo
+como modificado. Es un cambio local que no hace falta subir; `git checkout mlflow/mlflow.db` lo revierte.
+
 Sin `make`: `python fuentes/train.py --etapa todo` (o `contrato`, `datos`, `traduccion`, `modelos`,
 `estadistica`, `figuras`, `reubicar`), y `python fuentes/datos_prep.py --etapa datos|contrato|verificar`.
 Ambos aceptan `--config configuracion/rapida.yaml`.
