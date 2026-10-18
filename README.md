@@ -1,163 +1,275 @@
-# CGMT — Combine-to-Game Movement Translation (v3.0.0)
+# Proyecto NFL: del Combine al juego (v3.1.0)
 
-Do NFL Combine drills predict how a prospect moves and performs in regular-season
-games, and does that tell us who becomes a starter? This project answers it for one
-narrow slice of movement, **the first seconds after the snap**, measured two ways:
+¿Las pruebas del NFL Combine pronostican cómo se mueve y rinde un prospecto en los partidos de temporada
+regular, y eso dice algo sobre quién llega a ser titular? Este proyecto lo responde para una franja concreta
+del movimiento, **los primeros segundos después del snap**, medida de dos formas:
 
-- the **Snap Burst Index (SBI)**: distance covered 2.0 s after the snap from 10 Hz
-  tracking (the game analog of the 10-yard split), averaged over a player's plays,
-  shrunk toward his position group by empirical Bayes and scaled 50 ± 10 within position;
-- **season-long on-field metrics over expected** (v2.0, from `player_play`): DL get-off
-  and pressure rate, OL pressure probability and pressures allowed, WR/TE separation at
-  the throw, each scored against the average prospect play in the same context
-  (alignment, dropback length, route).
+- el **Snap Burst Index (SBI)**: la distancia recorrida 2.0 s después del snap según el tracking a 10 Hz (el
+  análogo en partido del parcial de 10 yardas), promediada sobre las jugadas de cada jugador, contraída hacia
+  su grupo de posición por Bayes empírico y escalada a 50 ± 10 dentro de la posición;
+- **métricas de campo de temporada completa sobre lo esperado** (desde `player_play`): arranque y tasa de
+  presión de la línea defensiva, probabilidad de presión y presiones permitidas de la línea ofensiva, y
+  separación de receptores y alas cerradas al lanzamiento, cada una comparada con la jugada media de un
+  prospecto en el mismo contexto (alineación, duración del dropback, ruta).
 
-The technical report (methods, figures, metrics, statistical tests and
-insights) is published as a Claude doc; `reports/` holds every number and
-figure it cites.
+**Respuesta corta.** Las pruebas de sprint y salto sí se trasladan al juego, con más claridad en la línea
+defensiva: el Combine pronostica el snap burst de un liniero con 21% menos error que la posición sola, y su
+arranque en partido, que es el camino por el que el atletismo se vuelve presión al pasador. Pero una vez que se
+conoce el turno de draft, ni el movimiento en partido ni el tracking de las pruebas mejoran la predicción de
+quién será titular.
 
-## Data contract (v2.1)
+El **reporte técnico final** (métodos, figuras, métricas, pruebas estadísticas y conclusiones) y el
+**historial de versiones** están en [CHANGELOG.md](CHANGELOG.md). Este README es la guía para reproducir el
+proyecto y explica las decisiones de diseño.
 
-The provider's data structure spec (`docs/Data_structure_CSV_files.docx`) is encoded in
-`configs/data_contract.yaml` and checked on every run (`make validate`, also the first step of
-`make data`). The report `reports/metrics/data_contract_report.csv` has one row per check, with
-severity and the handling the pipeline applies. Errors (missing required file or column,
-duplicate key, broken foreign key) stop the run. Deviations are warnings, handled by business rules.
+## Estructura del repositorio
 
-Against the files delivered: **0 errors, 32 warnings** (435 checks). What differs from the spec:
-
-| Spec | Delivered | Effect |
-|---|---|---|
-| `combine_tracking.csv`, 6,310 drill attempts | `combine_tracking_6.csv`: 6,310 attempts, 510 prospects (v2.2) | 40 lane outside the 0-53.3 yd frame; ball rows exceed player ranges and are dropped (R16) |
-| `game_tracking_2023/2024/2025.csv`, full seasons, all 510 prospects | v3.0: `game_tracking_2023_5.csv` (2023 season), `_2024_1_5.csv` (2024 weeks 0-17), `_2024_2.csv` and `_2025_2.csv` (Week 18 + playoffs); no 2025 weeks 1-17 | 343 prospects tracked after R8b; the SBI uses 299 players with 3+ plays (24,828 player-plays). Split parts are ignored when the full file is present |
-| complete files | `game_tracking_2023_5.csv` has exactly 1,048,575 data rows, a spreadsheet's row limit | almost certainly cut when saved; R8c drops the file's last (possibly partial) player-play and the contract warns. The uncut file would add 2023 plays |
-| `player_play.csv`, 316,338 rows | `player_play_3.csv`, 314,197 rows (-0.68%) | results use the rows delivered |
-| games: REG/POST, weeks 1-18 | also PRE (147 games, weeks 0-3), playoffs weeks 19-23 | R10 on-field = REG; R8b tracking = REG + POST |
-| `down` 1-4 | 961 rows with down 0 (two-point tries) | R15 removes them (none was a family play) |
-| quick/unblocked pressure, recovered fumble, TFL as 1.0/null | TRUE/FALSE text | the boolean parser reads both |
-
-## Combine drill tracking (v2.2)
-
-1. **The start of a tracked drill is not repeatable; distance splits are.** Across a player's two 40s the
-   0-5 yd split repeats at r = 0.16, the 5-10 yd split at 0.87 and top speed at 0.99. Features are gated at
-   r >= 0.5, one per construct: 40 acceleration (5-10 yd), 40 top speed, speed kept through the shuttle turns,
-   and position-drill top speed and acceleration (z-scored within each drill as run by one position group).
-2. **The tracking reproduces the stopwatch.** Tracked 40 top speed vs official 40: rho -0.97.
-3. **It improves no model.** Position-drill top speed correlates +0.37 with DL get-off (q = 0.009). Within
-   the DL it tracks the 40 (rho -0.76), and with weight, role and the 40 held fixed the link falls to +0.13
-   (p = 0.31). Same folds with and without drill tracking: R² change +0.004 for DL snap burst, -0.007 for WR
-   snap burst (v3.0), -0.004 for DL get-off and -0.03 to -0.05 elsewhere. Starter AUC is 0.915 -> 0.913
-   (DeLong p = 0.30). Champions are unchanged; the drill-tracking models are registered as challengers.
-
-## Headline findings (v3.0, full-season game tracking)
-
-With the 2023 season and 2024 weeks 0-17 added, the median tracked player has 39 plays instead of 8.
-
-1. **Snap burst is a stable trait for defensive linemen and wide receivers.** ICC: DL 0.63, WR 0.62
-   (was -0.34 with Week 18 only), OL 0.40, DB 0.26. With play context removed WRs stay at 0.62 and the
-   DL falls to 0.14: a lineman's burst is mostly his role (edge vs interior), a receiver's is his own.
-2. **Combine now predicts DL snap burst significantly.** Random forest RMSE 7.85 vs 9.99 for position alone
-   (-21%), pooled out-of-fold R^2 0.37 [0.17, 0.50], corrected resampled t-test Holm p = 0.001 (v2.2: 0.45).
-   Wide receivers (new): ridge -10%, pooled R^2 0.22 [-0.01, 0.31], better in most folds (Wilcoxon p = 0.03)
-   but not significant under the corrected t-test (p = 0.30). All positions: -5%, R^2 0.07.
-3. **Sprint and jump drills carry into game movement; the NGS composite and bench press do not.** 35 of 63
-   within-position drill x movement cells pass FDR (25 in v2.2); the 40 vs in-game top speed rho 0.43.
-4. **Game movement adds nothing to predicting starters once draft capital is known.** Draft pick lifts ROC-AUC
-   from 0.84 to 0.91 (510 prospects); among 299 tracked players movement changes AUC by -0.003 to 0.000
-   (DeLong p >= 0.47); GLM odds ratio per 10 SBI points 0.87 [0.61, 1.24], p = 0.45.
-5. **A methods trap:** a metric built from a player's best plays (80th percentile) reads 0.50 yd low at 3
-   plays and correlates more with start rate than the unbiased mean (rho 0.12 vs 0.07).
-
-## On-field findings (v2.0, unchanged)
-
-1. **Drills forecast DL get-off, and get-off drives pressure.** Within the defensive line the
-   vertical, 40, 10-yd split and broad jump correlate 0.36-0.43 with season-long get-off over
-   expected (FDR q < 0.05), also within edge/interior role. About half of each drill's link to
-   pressure runs through get-off (10-yd split indirect effect 0.15 SD, 95% CI 0.04-0.30).
-2. **Combine models predict DL get-off and WR/TE separation, not pressure or protection.**
-   Pooled out-of-fold R^2 0.13 (get-off, random forest) and 0.19 (separation, ridge; size-led);
-   DL pressure and OL protection do not beat position alone. OL protection tracks draft capital.
-3. **Season-long metrics are reliable traits** (ICC: get-off 0.89, WR separation 0.75, OL 0.74),
-   and the tracking SBI is a valid get-off proxy (v3.0: rho 0.45 with season-long get-off for 69 DL, 0.28 with pressure).
-4. **On-field performance adds a little to starter prediction; projections add nothing.** Observed
-   on-field performance +0.004 to +0.009 AUC (GLM OR 1.47 per SD beyond draft pick, p = 0.04);
-   a stacked Combine -> on-field projector changes AUC by -0.002 to +0.0004.
-
-## Layout
+La estructura sigue el documento `Estructura_Gitub_NFL.docx`. Las carpetas y archivos marcados como
+**complemento** no estaban en ese documento; se agregaron porque el proyecto los necesita para ser
+reproducible (configuración, pruebas, resultados, registro de modelos e integración continua).
 
 ```
-configs/config.yaml        single source of truth: paths, business rules, CV, grids
-configs/smoke.yaml         same pipeline on tiny CV/grids (CI)
-configs/data_contract.yaml the provider's data structure spec as a checked contract (v2.1)
-docs/                      Data_structure_CSV_files.docx (the spec)
-data/raw/                  the ten input CSVs (not in git; hashed in data/manifest.json)
-data/processed/            prospects, tracking play metrics, movement profiles, on-field plays + profiles (parquet)
-src/cgmt/
-  contract.py              data-contract validation and report (v2.1)
-  data.py                  file resolution (spec names + split parts), schemas, integrity, manifest
-  cleaning.py              business rules R1-R7, starter target
-  movement.py              tracking cleaning (R8-R9), per-play metrics, SBI, reliability
-  performance.py           player_play rules R10-R15, on-field metrics over expected, stability (v2.0)
-  combine_tracking.py      Combine drill tracking (spec File 3, R16): attempt metrics, reliability gate, features (v2.2)
-  features.py              nested feature sets
-  models.py                PositionMedianImputer, OnFieldProjector, pipelines, nested CV, final refit
-  stats.py                 corrected t-test, Wilcoxon-Holm, Friedman, DeLong, bootstrap, mediation
-  mlops.py                 MLflow tracking, tags, model registry
-  viz.py                   21 report figures
-  pipeline.py              CLI orchestrator
-tests/                     34 pytest tests
-reports/metrics/           every table behind the report (CSV/JSON)
-reports/figures/           fig01 ... fig21
-mlflow.db, mlartifacts/    experiment store and model registry (in the release archive)
+NFL/
+│── datos/
+│   ├── datos_ini/            # datos originales: los diez CSV comprimidos (.csv.gz) + manifiesto.json
+│   └── datos_limp/           # datos limpios listos para modelar (parquet)
+│       └── intermedios/      #   cuadros de tracking limpios y contexto de jugada
+│── fuentes/
+│   ├── entrena.ipynb         # notebook de Colab (entrenamiento y evaluación)
+│   ├── datos_prep.py         # funciones de limpieza y preparación de datos
+│   └── train.py              # script de entrenamiento, evaluación y registro en MLflow
+│── README.md                 # guía de reproducción y decisiones (este archivo)
+│── CHANGELOG.md              # reporte final + historial de versiones
+│
+│   Complementos
+│── configuracion/            # complemento: parámetros del flujo
+│   ├── config.yaml           #   rutas, reglas de negocio, validación cruzada y rejillas (corrida de entrega)
+│   ├── rapida.yaml           #   el mismo flujo con rejillas mínimas (CI, unos 10 min)
+│   └── contrato_datos.yaml   #   la especificación del proveedor como contrato que se revisa en cada corrida
+│── pruebas/                  # complemento: 35 pruebas unitarias (pytest)
+│── reportes/                 # complemento: resultados
+│   ├── figuras/              #   las 21 figuras del reporte (PNG)
+│   └── metricas/             #   cada tabla detrás del reporte (CSV/JSON)
+│── documentos/               # complemento
+│   ├── Data_structure_CSV_files.docx   # especificación de los datos del proveedor
+│   └── tarjeta_modelo.md     #   tarjeta de los modelos registrados
+│── mlflow/                   # complemento: almacén de experimentos y registro de modelos
+│   ├── mlflow.db             #   corridas, métricas, etiquetas y modelos registrados (SQLite)
+│   └── mlartifacts/          #   artefactos: modelos, puntajes por pliegue, predicciones
+│── .github/workflows/ci.yml  # complemento: integración continua (pruebas, hashes, contrato, corrida rápida)
+│── requirements.txt          # complemento: dependencias fijadas (Python 3.13)
+│── pyproject.toml            # complemento: configuración de pytest
+│── Makefile                  # complemento: atajos para cada etapa
+└── .gitignore
 ```
 
-## Reproduce
+**Qué hay en cada archivo de `fuentes/`.**
+
+| Archivo | Contenido |
+| --- | --- |
+| `datos_prep.py` | Configuración y semilla; resolución de archivos y manifiesto (versionado de datos); contrato de datos; limpieza de prospectos (reglas R1–R7); tracking de partido → métricas por jugada → perfiles y SBI (R8–R9); `player_play` → métricas de campo sobre lo esperado (R10–R15); tracking de las pruebas del Combine (R16); conjuntos de variables y tablas de modelado. |
+| `train.py` | Preprocesamiento y CV anidada (imputador por posición, proyector apilado, pipelines); pruebas estadísticas (t corregida, Wilcoxon-Holm, Friedman, DeLong, bootstrap, mediación); MLflow (seguimiento, etiquetas, registro); análisis de traducción; regresión y clasificación; las 21 figuras; la línea de comandos. |
+| `entrena.ipynb` | El flujo completo en Google Colab, paso a paso, con las tablas y figuras de evaluación y la carga de los modelos registrados. |
+
+## Datos
+
+Los diez archivos originales están en `datos/datos_ini/`, comprimidos con gzip: `player_play_3.csv` pesa 147 MB
+y GitHub no acepta archivos de más de 100 MB. Comprimidos ocupan 100 MB en lugar de 427 MB. pandas los lee sin
+descomprimir a disco, y el código acepta igual un `.csv` que un `.csv.gz`, así que una entrega nueva sin
+comprimir funciona sin cambios.
+
+| Archivo | Contenido | Registros |
+| --- | --- | --- |
+| `combine_results.csv.gz` | Resultados oficiales del Combine 2023–2025 | 510 prospectos |
+| `players.csv.gz` | Datos biográficos y de draft | 510 |
+| `player_career_successes.csv.gz` | Partidos jugados e iniciados hasta 2025 | 510 |
+| `games.csv.gz` | Calendario y tipo de partido | 1,002 partidos |
+| `game_tracking_2023_5.csv.gz` | Tracking a 10 Hz, temporada 2023 (cortado en el límite de una hoja de cálculo) | 1,048,575 |
+| `game_tracking_2024_1_5.csv.gz` | Tracking, semanas 0–17 de 2024 | 951,733 |
+| `game_tracking_2024_2.csv.gz`, `game_tracking_2025_2.csv.gz` | Tracking, semana 18 y playoffs de 2024 y 2025 | 96,842 y 97,147 |
+| `player_play_3.csv.gz` | Una fila por jugador y jugada, 2023–2025 | 314,197 jugador-jugadas |
+| `combine_tracking_6.csv.gz` | Tracking a 10 Hz de las pruebas del Combine | 463,189 cuadros |
+
+**Manifiesto.** `datos/datos_ini/manifiesto.json` guarda el SHA-256, el tamaño y el número de líneas del
+contenido descomprimido de cada archivo, más una versión combinada `data_version = a75ba51ae4b9`. Comprimir
+no cambia la versión de datos. `make verificar` vuelve a calcular los hashes y falla ante cualquier diferencia.
+
+**Contrato de datos.** La especificación del proveedor (`documentos/Data_structure_CSV_files.docx`) está
+codificada en `configuracion/contrato_datos.yaml` y se revisa en cada corrida (`make validar`, también el
+primer paso de la etapa de datos). El reporte `reportes/metricas/data_contract_report.csv` tiene una fila por
+revisión, con su severidad y el manejo que aplica el flujo. Los errores (archivo o columna obligatoria
+faltante, clave duplicada, clave foránea rota) detienen la corrida; las desviaciones son advertencias que
+manejan las reglas de negocio. Con los archivos entregados: **435 revisiones, 0 errores, 32 advertencias.**
+
+| Especificación | Entregado | Efecto |
+| --- | --- | --- |
+| `combine_tracking.csv`, 6,310 intentos | `combine_tracking_6.csv`: 6,310 intentos, 510 prospectos | El carril del 40 queda fuera del marco de 0–53.3 yd; las filas del balón superan los rangos de un jugador y se descartan (R16) |
+| `game_tracking_2023/2024/2025.csv`, temporadas completas | Temporada 2023, semanas 0–17 de 2024, semana 18 y playoffs de 2024 y 2025; faltan las semanas 1–17 de 2025 | 343 prospectos con tracking tras R8b; el SBI usa 299 jugadores con 3+ jugadas (24,828 jugador-jugadas) |
+| Archivos completos | `game_tracking_2023_5.csv` tiene exactamente 1,048,575 filas, el límite de una hoja de cálculo | Casi seguro se cortó al guardarse; R8c descarta la última jugador-jugada (posiblemente parcial) y el contrato lo advierte |
+| `player_play.csv`, 316,338 filas | `player_play_3.csv`, 314,197 filas (−0.68%) | Los resultados usan las filas entregadas |
+| Partidos REG/POST, semanas 1–18 | También PRE (147 partidos, semanas 0–3) y playoffs en semanas 19–23 | R10: el campo usa REG; R8b: el tracking usa REG + POST |
+| `down` 1–4 | 961 filas con down 0 (intentos de dos puntos) | R15 las quita (ninguna era de una familia medida) |
+| Indicadores 1.0/nulo | Texto TRUE/FALSE | El lector booleano acepta ambos |
+
+## Cómo reproducirlo
+
+### Opción 1: Google Colab
+
+1. Suba este repositorio a GitHub (ver [Publicar en GitHub](#publicar-en-github)).
+2. Abra `fuentes/entrena.ipynb` en Colab: en colab.research.google.com elija *Archivo → Abrir cuaderno →
+   GitHub* y pegue la URL del repositorio, o use el enlace
+   `https://colab.research.google.com/github/<usuario>/NFL/blob/main/fuentes/entrena.ipynb`.
+3. En la primera celda escriba la URL del repositorio en `REPO_URL` y elija `MODO = "rapida"` (unos 10 min,
+   rejillas mínimas, salidas en carpetas propias) o `MODO = "completa"` (la corrida de entrega, unos 90 min en
+   los 2 núcleos de Colab).
+4. Ejecute todo (*Entorno de ejecución → Ejecutar todas*). El notebook clona el repositorio, instala las
+   dependencias, valida los datos, prepara los datos limpios, entrena y evalúa, muestra las tablas y figuras, y
+   carga los modelos registrados.
+
+Sin entrenar nada, el notebook también puede cargar directamente los 17 modelos de la corrida de entrega que
+vienen en `mlflow/`.
+
+### Opción 2: en su computadora
+
+Requiere Python 3.13 (las versiones están fijadas en `requirements.txt`) y `make`.
 
 ```bash
-python -m pip install -r requirements.txt     # Python 3.13, pinned versions
-make relocate                                 # once, after extracting the archive (repoints MLflow paths)
-make validate                                 # data contract only, ~10 s
-make test                                     # 34 unit tests, ~5 s
-make smoke                                    # whole pipeline on tiny grids, ~5 min (own output folders)
-make all                                      # release run, ~90 min on 2 cores
-make ui                                       # MLflow UI: runs + registry
+git clone https://github.com/<usuario>/NFL.git && cd NFL
+python -m pip install -r requirements.txt
+make reubicar     # una vez tras clonar: apunta las rutas del almacén MLflow a esta carpeta
+make verificar    # hashes de los datos originales vs el manifiesto, unos 5 s
+make validar      # solo el contrato de datos, unos 10 s
+make pruebas      # 35 pruebas unitarias, unos 5 s
+make rapida       # todo el flujo con rejillas mínimas, unos 10 min (carpetas propias, no toca la entrega)
+make todo         # corrida de entrega: datos, traducción, modelos, estadística y figuras, unos 90 min
+make ui           # interfaz de MLflow: corridas, métricas y modelos registrados
 ```
 
-Stages can be run on their own: `make validate`, `make data`, `make translation`, `make models`,
-`make stats`, `make figures`. Everything is seeded (`seed: 42`); a test asserts that two fits
-with the same seed give identical predictions.
+Cada etapa también corre sola, en este orden:
 
-Load a registered model:
+| Etapa | Comando | Qué hace | Escribe |
+| --- | --- | --- | --- |
+| contrato | `make validar` | Revisa los diez CSV contra la especificación | `reportes/metricas/data_contract_*` |
+| datos | `make datos` | Contrato, ingesta, manifiesto, limpieza (R1–R16), métricas de movimiento y de campo | `datos/datos_limp/`, auditorías en `reportes/metricas/` |
+| traducción | `make traduccion` | Correlaciones prueba-partido y prueba-campo, fiabilidad, mediación, GLM de titulares | `reportes/metricas/` |
+| modelos | `make modelos` | Traducción + CV anidada de regresión y clasificación, pruebas, reajuste final y registro | `reportes/metricas/`, `mlflow/` |
+| estadística | `make estadistica` | Vuelve a calcular las pruebas ómnibus desde los puntajes por pliegue, sin reentrenar | `reportes/metricas/` |
+| figuras | `make figuras` | Dibuja las 21 figuras desde las métricas guardadas | `reportes/figuras/` |
+
+Sin `make`: `python fuentes/train.py --etapa todo` (o `contrato`, `datos`, `traduccion`, `modelos`,
+`estadistica`, `figuras`, `reubicar`), y `python fuentes/datos_prep.py --etapa datos|contrato|verificar`.
+Ambos aceptan `--config configuracion/rapida.yaml`.
+
+Todo lleva semilla (`seed: 42`); una prueba verifica que dos ajustes con la misma semilla den predicciones
+idénticas, y la corrida completa reproduce los mismos números.
+
+### Cargar un modelo registrado
 
 ```python
 import mlflow
-mlflow.set_tracking_uri("sqlite:///mlflow.db")
+mlflow.set_tracking_uri("sqlite:///mlflow/mlflow.db")       # desde la raíz del repositorio
 clf = mlflow.sklearn.load_model("models:/cgmt-starter-classifier@champion")
+info = mlflow.models.get_model_info("models:/cgmt-starter-classifier@champion")
+print(info.signature)                                         # columnas de entrada esperadas
 ```
 
-## Versioning strategy
+Los modelos se guardan junto con `datos_prep.py` y `train.py`, así cargan en cualquier máquina sin instalar
+nada más que `requirements.txt`. La entrada es un DataFrame con `combine_position` más las columnas del
+conjunto de variables del modelo; las pruebas faltantes se permiten (se imputan dentro del pipeline). La
+[tarjeta del modelo](documentos/tarjeta_modelo.md) describe cada uno de los 17 modelos registrados.
 
-- **Code:** git + semantic version tags; every change is described in
-  [CHANGELOG.md](CHANGELOG.md). MAJOR = a metric/target definition changed,
-  MINOR = new analysis or model, PATCH = no number in `reports/metrics/` changes.
-- **Data:** `data/manifest.json` stores SHA-256, bytes and rows per raw file and a
-  combined `data_version`; CI fails on a hash mismatch. The data contract
-  (`configs/data_contract.yaml`) is versioned with the code: a change in the provider's spec
-  is a contract change recorded in the changelog.
-- **Experiments:** each MLflow run is tagged with `pipeline_version`,
-  `data_version`, `git_commit` and `seed`.
-- **Models:** registered with aliases (`champion`, `challenger`) and a
-  `validation_status` tag.
+## Decisiones de diseño
 
-## Data notes
+Cada decisión responde a un problema que apareció en los datos; el razonamiento completo está en el
+[reporte](CHANGELOG.md) y en el historial de versiones.
 
-- Combine drills are measured two ways: official results (times, distances) and, since v2.2, 10 Hz drill
-  tracking (`combine_tracking_6.csv`). Only tracking metrics that repeat within a player are used.
-- Game tracking (v3.0) covers the 2023 season, 2024 weeks 0-17, and Week 18 + playoffs of 2024 and 2025
-  (2025 weeks 1-17 were not delivered). Preseason games are removed (R8b). There are 1-4 tracked players
-  per play and no ball or opponents, so the SBI uses individual kinematics.
-- `player_play` (v2.0) covers every game of 2023-2025 for 497 prospects; the on-field metrics
-  use regular-season, non-nullified plays on downs 1-4 only (239,673 rows). DBs get no on-field metric (the
-  file has no coverage outcome). "Expected" is the average of prospect plays in the same context.
-- The careers table covers seasons through 2025; start rate is normalised by the
-  seasons each class has been in the league.
+1. **El SBI es una media contraída, no un percentil alto.** La primera versión usaba el percentil 80 de las
+   jugadas de cada jugador ("capacidad"). Con pocas jugadas ese percentil lee de menos, y como los titulares
+   juegan más, el sesgo fabricaba una correlación con la titularidad (0.23 → 0.08 al corregirlo). La media con
+   contracción por Bayes empírico no tiene ese sesgo; el percentil 80 queda solo como análisis de sensibilidad.
+2. **El objetivo se normaliza dentro de la posición.** Con el burst en yardas, la media por posición daba
+   R² = 0.94 y ocultaba la pregunta que importa: dentro de una posición, ¿el Combine distingue a quién se mueve
+   mejor? El SBI (50 ± 10 dentro de la posición) obliga a responder esa pregunta.
+3. **"Sobre lo esperado" para las métricas de campo.** La presión, la separación o el arranque dependen de la
+   alineación, la ruta y la duración del dropback. Cada jugada se compara con la media de las jugadas de
+   prospectos en el mismo contexto, y después se contrae por Bayes empírico.
+4. **Validación cruzada anidada y pruebas conservadoras.** 5 pliegues × 3 repeticiones por fuera y GridSearchCV
+   de 3 pliegues por dentro: los hiperparámetros nunca ven el pliegue de prueba. Como los pliegues comparten
+   jugadores, se usa la prueba t corregida de Nadeau y Bengio, con Wilcoxon, Holm, Friedman y DeLong como
+   controles. Una ganancia solo se llama significativa si pasa la prueba corregida.
+5. **Sin fugas de información.** La imputación por mediana de posición y el escalado se aprenden dentro de
+   cada pliegue; las variables de movimiento son promedios por jugada, nunca conteos (los conteos siguen al
+   tiempo de juego); la posición NFL nunca es variable porque se decide después del draft.
+6. **Campeón y retador.** El campeón de titulares solo puede usar lo que se sabe antes del draft (Combine +
+   capital de draft). Un conjunto nuevo lo reemplaza solo con un AUC medio mayor y DeLong p < 0.05. Los modelos
+   con información posterior al draft (movimiento, rendimiento de campo) quedan como retadores de diagnóstico.
+7. **El tracking de las pruebas se filtra por fiabilidad.** Solo se usan las métricas que se repiten entre los
+   intentos de un jugador (r ≥ 0.5), una por constructo; el inicio de un intento registrado no se repite y se
+   descarta.
+8. **Un contrato de datos explícito.** La especificación del proveedor se revisa en cada corrida, así una
+   entrega distinta (archivos partidos, columnas extra, un archivo cortado) se detecta antes de llegar a un
+   modelo y su manejo queda documentado.
+9. **Dos módulos y una configuración.** Toda la preparación vive en `datos_prep.py` y todo el modelado en
+   `train.py`, como pide la estructura; los umbrales y rejillas viven en `configuracion/config.yaml`, nunca en
+   el código.
+10. **MLflow local con SQLite.** El registro de modelos funciona sin servidor ni conexión y viaja con el
+    repositorio; `make reubicar` corrige las rutas absolutas que MLflow guarda.
+11. **Identificadores en inglés, documentación en español.** Los nombres de funciones, columnas, métricas y
+    modelos registrados se conservan en inglés porque los comparten el código, los archivos de métricas y el
+    registro de MLflow entre versiones; todo lo que se lee (documentación, comentarios, mensajes, figuras) está
+    en español.
+
+## Resultados principales
+
+| Pregunta | Resultado |
+| --- | --- |
+| ¿Se repite el snap burst de un jugador entre jugadas? | Sí en la línea defensiva (ICC 0.63, casi todo por el rol) y en receptores (0.62, propio del jugador); débil en backs defensivos (0.26) |
+| ¿Pronostica el Combine el SBI? | Línea defensiva: RMSE 7.85 vs 9.99 de la posición sola (−21%), R² 0.37, Holm p = 0.001. Receptores: −10%, evidencia moderada. Todas las posiciones: −5% |
+| ¿Qué pruebas se trasladan? | El 40, el parcial de 10 yd, el salto largo y el vertical (ρ 0.25–0.43 dentro de la posición); el compuesto NGS y el press de banca no |
+| ¿Pronostica el Combine el rendimiento de campo? | Arranque de la DL (R² 0.13) y separación de WR/TE (0.19, por el tamaño); no la presión ni la protección de pase |
+| ¿Ayuda el movimiento a predecir titulares? | No después del draft: AUC 0.84 → 0.91 con el capital de draft; el movimiento suma −0.003 a 0 (DeLong p ≥ 0.47) |
+| ¿Suma el tracking de las pruebas? | No: reproduce el cronómetro (ρ −0.97 con el 40 oficial) y no mejora ningún modelo |
+
+Las conclusiones para scouts, oficinas generales y entrenadores, con las tablas de brecha de traducción, están
+en la sección 10 del [reporte](CHANGELOG.md#10-conclusiones-accionables).
+
+## Versionado y MLOps
+
+- **Código:** git con etiquetas de versión semántica y cada cambio descrito en [CHANGELOG.md](CHANGELOG.md).
+  MAYOR = cambió la definición de una métrica u objetivo; MENOR = análisis o modelo nuevo; PARCHE = no cambia
+  ningún número de `reportes/metricas/`.
+- **Datos:** el manifiesto guarda el hash de cada archivo original y la versión combinada `data_version`; la
+  CI falla si un hash no coincide. El contrato de datos se versiona con el código.
+- **Experimentos:** cada corrida de MLflow lleva `pipeline_version`, `data_version`, `git_commit` y `seed`, los
+  puntajes de cada pliegue, las predicciones fuera de pliegue y los hiperparámetros elegidos.
+- **Modelos:** registrados con alias (`champion`, `challenger`), firma, ejemplo de entrada y la etiqueta
+  `validation_status = nested-cv-passed`.
+- **Integración continua:** `.github/workflows/ci.yml` corre las pruebas, los hashes, el contrato y la corrida
+  rápida en cada push a `main`.
+
+## Limitaciones y datos pendientes
+
+- Faltan las semanas 1–17 de 2025 en el tracking de partido, y `game_tracking_2023_5.csv` se detiene en
+  1,048,575 filas, así que falta al azar una parte de 2023. Entregar el archivo de 2023 sin cortar y la
+  temporada regular de 2025 haría más precisos los modelos del SBI; el flujo encuentra los archivos nuevos por
+  patrón y los valida sin cambiar código.
+- El tracking trae de 1 a 4 jugadores por jugada, sin rivales ni balón, así que el movimiento se juzga con la
+  cinemática del propio jugador.
+- Las muestras por posición son chicas (72 linieros defensivos y 63 receptores en los modelos del SBI).
+- Los backs defensivos no tienen métrica de campo: `player_play` no trae resultados de cobertura.
+- "Lo esperado" se calcula con las jugadas de los propios prospectos, no con las de toda la liga.
+
+## Publicar en GitHub
+
+El repositorio ya tiene su historial de git y sus etiquetas de versión. Cree un repositorio vacío en GitHub
+(sin README ni licencia) y súbalo:
+
+```bash
+git remote add origin https://github.com/<usuario>/NFL.git
+git push -u origin main --tags
+```
+
+Ningún archivo supera el límite de 100 MB de GitHub; el más grande es `player_play_3.csv.gz` con 41 MB, y el
+repositorio completo ocupa unos 160 MB. Si el repositorio va a ser público, confirme antes que puede publicar
+los datos del proveedor; si no, quítelos del control de versiones (`git rm -r --cached datos/datos_ini`) y
+compártalos por otro medio: el flujo los encuentra igual al copiarlos en `datos/datos_ini/`.

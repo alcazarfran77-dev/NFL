@@ -1,18 +1,12 @@
-[build-system]
-requires = ["setuptools>=69"]
-build-backend = "setuptools.build_meta"
-
+# Metadatos del proyecto y configuración de pytest. El código vive en fuentes/ (dos módulos: datos_prep y train).
 [project]
-name = "cgmt"
-version = "3.0.0"
-description = "Combine-to-Game Movement Translation: do NFL Combine drills predict how prospects move in games?"
+name = "nfl-combine"
+version = "3.1.0"
+description = "Proyecto NFL: ¿se traduce el movimiento en las pruebas del Combine al movimiento y rendimiento en partidos de temporada regular?"
 requires-python = ">=3.11"
 readme = "README.md"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["src"]
+testpaths = ["pruebas"]
+pythonpath = ["fuentes", "."]
 filterwarnings = ["ignore::DeprecationWarning", "ignore::FutureWarning"]

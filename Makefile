@@ -1,44 +1,47 @@
+# Atajos para reproducir el proyecto. En Colab se usa fuentes/entrena.ipynb, que llama a lo mismo.
 PY ?= python3
-export PYTHONPATH := src
 export MLFLOW_DISABLE_AGENT_HINT := 1
 
-.PHONY: install test smoke validate data translation models stats figures all ui relocate clean
+.PHONY: instalar pruebas rapida validar verificar datos traduccion modelos estadistica figuras todo reubicar ui limpiar
 
-install:            ## install pinned dependencies
+instalar:           ## instala las dependencias fijadas
 	$(PY) -m pip install -r requirements.txt
 
-test:               ## unit tests (cleaning rules, movement metrics, statistics, determinism)
+pruebas:            ## pruebas unitarias (reglas de limpieza, métricas de movimiento, estadística, contrato, determinismo)
 	$(PY) -m pytest -q
 
-smoke:              ## whole pipeline on tiny CV/grids (CI)
-	$(PY) -m cgmt.pipeline --config configs/smoke.yaml --stage all
+rapida:             ## todo el flujo con CV y rejillas mínimas (CI, ~10 min; carpetas de salida propias)
+	$(PY) fuentes/train.py --config configuracion/rapida.yaml --etapa todo
 
-validate:           ## data contract only: raw files vs docs/Data_structure_CSV_files.docx -> reports/metrics/data_contract_*
-	$(PY) -m cgmt.pipeline --stage contract
+validar:            ## solo el contrato de datos: originales vs especificación -> reportes/metricas/data_contract_*
+	$(PY) fuentes/datos_prep.py --etapa contrato
 
-data:               ## contract + ingest + clean + movement + on-field metrics + manifest
-	$(PY) -m cgmt.pipeline --stage data
+verificar:          ## compara el hash de cada archivo original con datos/datos_ini/manifiesto.json
+	$(PY) fuentes/datos_prep.py --etapa verificar
 
-translation:        ## drill-vs-game statistics, reliability, GLM
-	$(PY) -m cgmt.pipeline --stage translation
+datos:              ## contrato + ingesta + limpieza + movimiento + métricas de campo + manifiesto
+	$(PY) fuentes/datos_prep.py --etapa datos
 
-models:             ## translation + nested-CV regression and classification + registry
-	$(PY) -m cgmt.pipeline --stage models
+traduccion:         ## asociaciones prueba-partido, fiabilidad y GLM sobre los datos limpios
+	$(PY) fuentes/train.py --etapa traduccion
 
-stats:              ## recompute omnibus tests from saved fold scores (no retraining)
-	$(PY) -m cgmt.pipeline --stage stats
+modelos:            ## traducción + CV anidada de regresión y clasificación + registro en MLflow
+	$(PY) fuentes/train.py --etapa modelos
 
-figures:            ## regenerate reports/figures from saved metrics
-	$(PY) -m cgmt.pipeline --stage figures
+estadistica:        ## recalcula las pruebas ómnibus desde los puntajes por pliegue (sin reentrenar)
+	$(PY) fuentes/train.py --etapa estadistica
 
-all:                ## full reproducible run (about 25 min on 2 cores)
-	$(PY) -m cgmt.pipeline --stage all
+figuras:            ## regenera reportes/figuras desde las métricas guardadas
+	$(PY) fuentes/train.py --etapa figuras
 
-relocate:           ## once after extracting the archive elsewhere: repoint MLflow artifact paths
-	$(PY) -m cgmt.pipeline --stage relocate
+todo:               ## corrida completa reproducible (~90 min en 2 núcleos)
+	$(PY) fuentes/train.py --etapa todo
 
-ui:                 ## browse runs and the model registry
-	mlflow ui --backend-store-uri sqlite:///mlflow.db
+reubicar:           ## una vez tras clonar o extraer: apunta las rutas del almacén MLflow a esta carpeta
+	$(PY) fuentes/train.py --etapa reubicar
 
-clean:              ## remove generated data and smoke artefacts (keeps raw data and mlflow.db)
-	rm -rf data/interim data/processed reports/smoke mlflow_smoke.db mlartifacts_smoke
+ui:                 ## explora corridas y el registro de modelos
+	mlflow ui --backend-store-uri sqlite:///mlflow/mlflow.db
+
+limpiar:            ## borra las salidas de la corrida rápida (conserva datos originales, limpios y mlflow.db)
+	rm -rf datos/rapida reportes/rapida mlflow/rapida.db mlflow/rapida_artifacts

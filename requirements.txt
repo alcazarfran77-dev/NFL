@@ -1,4 +1,4 @@
-# Pinned for reproducibility (Python 3.13). Update together with CHANGELOG.md.
+# Versiones fijadas para reproducibilidad (Python 3.13). Se actualizan junto con CHANGELOG.md.
 numpy==2.5.3
 pandas==3.0.5
 pyarrow==25.0.1

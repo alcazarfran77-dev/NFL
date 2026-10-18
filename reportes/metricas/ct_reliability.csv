@@ -1,0 +1,27 @@
+drill_group,metric,method,n_players,reliability,feature,passes_gate,note
+forty,split_0_5_s,test-retest (intentos 1 y 2),375,0.1561263099813351,,False,por debajo del filtro de fiabilidad
+forty,split_5_10_s,test-retest (intentos 1 y 2),375,0.8706932845656936,ct_forty_split_5_10_s,True,
+forty,split_10_20_s,test-retest (intentos 1 y 2),375,0.9795621363840007,,True,"mismo constructo que la velocidad máxima (r = -0.95), algo menos fiable"
+forty,split_10yd_s,test-retest (intentos 1 y 2),375,0.22580695058504704,,False,por debajo del filtro de fiabilidad
+forty,top_speed,test-retest (intentos 1 y 2),375,0.9859473690680479,ct_forty_top_speed,True,
+forty,peak_accel,test-retest (intentos 1 y 2),375,0.5051619362968542,,True,"mismo constructo que el parcial 5-10 yd, menos fiable"
+forty,burst_1s,test-retest (intentos 1 y 2),375,0.33156157905307737,,False,por debajo del filtro de fiabilidad
+forty,burst_2s,test-retest (intentos 1 y 2),375,0.4032762108198108,,False,por debajo del filtro de fiabilidad
+forty,t90_top_s,test-retest (intentos 1 y 2),375,0.38557262595773745,,False,por debajo del filtro de fiabilidad
+3cone,duration_s,test-retest (intentos 1 y 2),38,0.8163159121448282,,True,duplica el tiempo oficial de 3 conos
+3cone,top_speed,test-retest (intentos 1 y 2),38,0.5386561531466793,,True,"velocidad de sprint, ya medida en el 40"
+3cone,peak_accel,test-retest (intentos 1 y 2),38,0.495557395121516,,False,por debajo del filtro de fiabilidad
+3cone,peak_decel,test-retest (intentos 1 y 2),38,0.4324505287902996,,False,por debajo del filtro de fiabilidad
+3cone,plant_speed_ratio,test-retest (intentos 1 y 2),38,0.44444763800084036,,False,por debajo del filtro de fiabilidad
+3cone,max_cut_deg,test-retest (intentos 1 y 2),38,0.1360257588658732,,False,por debajo del filtro de fiabilidad
+shuttle,duration_s,test-retest (intentos 1 y 2),40,0.19976683660304148,,False,por debajo del filtro de fiabilidad
+shuttle,top_speed,test-retest (intentos 1 y 2),40,0.21288559077277333,,False,por debajo del filtro de fiabilidad
+shuttle,peak_accel,test-retest (intentos 1 y 2),40,0.30628407619464665,,False,por debajo del filtro de fiabilidad
+shuttle,peak_decel,test-retest (intentos 1 y 2),40,0.34918129688317207,,False,por debajo del filtro de fiabilidad
+shuttle,plant_speed_ratio,test-retest (intentos 1 y 2),40,0.5422856530828226,ct_shuttle_plant_speed_ratio,True,
+shuttle,max_cut_deg,test-retest (intentos 1 y 2),40,0.34380860219951975,,False,por debajo del filtro de fiabilidad
+skill,top_speed,"mitades, Spearman-Brown",510,0.7856658438000508,ct_skill_speed_z,True,
+skill,peak_accel,"mitades, Spearman-Brown",510,0.5454795600248556,ct_skill_accel_z,True,
+skill,peak_decel,"mitades, Spearman-Brown",510,0.3199589455636856,,False,por debajo del filtro de fiabilidad
+skill,max_cut_deg,"mitades, Spearman-Brown",510,0.2880275102403317,,False,por debajo del filtro de fiabilidad
+skill,burst_1s,"mitades, Spearman-Brown",510,0.2977120505534334,,False,por debajo del filtro de fiabilidad
