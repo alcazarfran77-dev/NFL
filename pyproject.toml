@@ -1,12 +1,12 @@
-# Metadatos del proyecto y configuración de pytest. El código vive en fuentes/ (dos módulos: datos_prep y train).
+# Project metadata and pytest configuration. The code lives in src/ (two modules: data_prep and train).
 [project]
 name = "nfl-combine"
-version = "3.1.0"
-description = "Proyecto NFL: ¿se traduce el movimiento en las pruebas del Combine al movimiento y rendimiento en partidos de temporada regular?"
+version = "3.2.0"
+description = "NFL project: does Combine drill movement translate into regular-season game movement and on-field performance?"
 requires-python = ">=3.11"
 readme = "README.md"
 
 [tool.pytest.ini_options]
-testpaths = ["pruebas"]
-pythonpath = ["fuentes", "."]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
 filterwarnings = ["ignore::DeprecationWarning", "ignore::FutureWarning"]

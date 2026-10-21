@@ -2,11 +2,11 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, english]
   pull_request:
 
 jobs:
-  pruebas-y-corrida-rapida:
+  tests-and-smoke-run:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,11 +15,11 @@ jobs:
           python-version: "3.13"
           cache: pip
       - run: pip install -r requirements.txt
-      - name: Pruebas unitarias
-        run: make pruebas
-      - name: Verificar los hashes de los datos originales (manifiesto)
-        run: make verificar
-      - name: Contrato de datos (especificación del proveedor)
-        run: make validar
-      - name: Corrida rápida de todo el flujo
-        run: make rapida
+      - name: Unit tests
+        run: make test
+      - name: Verify the raw-data hashes (manifest)
+        run: make verify
+      - name: Data contract (provider's spec)
+        run: make validate
+      - name: Smoke run of the whole pipeline
+        run: make smoke

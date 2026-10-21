@@ -1,0 +1,86 @@
+{
+  "created_utc": "2026-10-21T04:15:10+00:00",
+  "data_version": "261a80510390",
+  "files": {
+    "combine_results.parquet": {
+      "sha256": "2e2001d0f7512536e67db1412e91d67479ec4267fdc0372579c4cd1a753784f3",
+      "bytes": 15297,
+      "rows": 510,
+      "format": "parquet",
+      "stored_as": "combine_results.parquet",
+      "stored_bytes": 15297
+    },
+    "players.parquet": {
+      "sha256": "32e899164d32d97201cc6cd6c85f3f3e3ce67ef8c1e56495b181811919881bfe",
+      "bytes": 16531,
+      "rows": 510,
+      "format": "parquet",
+      "stored_as": "players.parquet",
+      "stored_bytes": 16531
+    },
+    "player_career_successes.parquet": {
+      "sha256": "ee96dd3d153c742aef6e6e5c1b6d4d8396393b658c2c32355d24dfd59ed2cf31",
+      "bytes": 8566,
+      "rows": 510,
+      "format": "parquet",
+      "stored_as": "player_career_successes.parquet",
+      "stored_bytes": 8566
+    },
+    "games.parquet": {
+      "sha256": "0ea516c2cb896de78dc97014acd9a5398a568ea54003955ef71169000424228c",
+      "bytes": 11424,
+      "rows": 1002,
+      "format": "parquet",
+      "stored_as": "games.parquet",
+      "stored_bytes": 11424
+    },
+    "game_tracking_2023_5.csv": {
+      "sha256": "1e7c6fb3c7d7240dc6217b05d0cbdf2281a49f94d0b712fb84cbc3fa9fb01670",
+      "bytes": 93739461,
+      "rows": 1048575,
+      "format": "csv.gz",
+      "stored_as": "game_tracking_2023_5.csv.gz",
+      "stored_bytes": 20510173
+    },
+    "game_tracking_2024_1_5.csv": {
+      "sha256": "b6b9d9041a32192b0010f55919d0bb5ddeee87ee12f7df1e502ecff1dd8ed428",
+      "bytes": 85272920,
+      "rows": 951733,
+      "format": "csv.gz",
+      "stored_as": "game_tracking_2024_1_5.csv.gz",
+      "stored_bytes": 18760542
+    },
+    "game_tracking_2024_2.csv": {
+      "sha256": "63b2cc1f055f20a469421c7099b6696c685d3463ded89b675be4c9d0d9464808",
+      "bytes": 8665108,
+      "rows": 96842,
+      "format": "csv.gz",
+      "stored_as": "game_tracking_2024_2.csv.gz",
+      "stored_bytes": 1898908
+    },
+    "game_tracking_2025_2.csv": {
+      "sha256": "100bba5457fcf735d019d0f71c636d0a48820336af4cd5a7fa69ea1a76f1bc98",
+      "bytes": 8688675,
+      "rows": 97147,
+      "format": "csv.gz",
+      "stored_as": "game_tracking_2025_2.csv.gz",
+      "stored_bytes": 1899454
+    },
+    "player_play_3.csv": {
+      "sha256": "68926a268c0a49e58616001fb35ea179018d9cbbce1c5c31e7a4095273c35b2a",
+      "bytes": 146879042,
+      "rows": 339841,
+      "format": "csv.gz",
+      "stored_as": "player_play_3.csv.gz",
+      "stored_bytes": 41312770
+    },
+    "combine_tracking_6.csv": {
+      "sha256": "541c69f6629f5f803b08033c5c386735582120973562134b2c1e7ec6553fb0d3",
+      "bytes": 83788174,
+      "rows": 463189,
+      "format": "csv.gz",
+      "stored_as": "combine_tracking_6.csv.gz",
+      "stored_bytes": 15536085
+    }
+  }
+}

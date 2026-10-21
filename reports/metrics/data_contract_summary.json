@@ -1,0 +1,75 @@
+{
+  "files": {
+    "players": [
+      "players.parquet"
+    ],
+    "combine": [
+      "combine_results.parquet"
+    ],
+    "careers": [
+      "player_career_successes.parquet"
+    ],
+    "games": [
+      "games.parquet"
+    ],
+    "player_play": [
+      "player_play_3.csv.gz"
+    ],
+    "tracking": [
+      "game_tracking_2023_5.csv.gz",
+      "game_tracking_2024_1_5.csv.gz",
+      "game_tracking_2024_2.csv.gz",
+      "game_tracking_2025_2.csv.gz"
+    ],
+    "combine_tracking": [
+      "combine_tracking_6.csv.gz"
+    ]
+  },
+  "formats": {
+    "players": [
+      "parquet"
+    ],
+    "combine": [
+      "parquet"
+    ],
+    "careers": [
+      "parquet"
+    ],
+    "games": [
+      "parquet"
+    ],
+    "player_play": [
+      "csv.gz"
+    ],
+    "tracking": [
+      "csv.gz"
+    ],
+    "combine_tracking": [
+      "csv.gz"
+    ]
+  },
+  "superseded_files": {},
+  "missing_files": [],
+  "coverage": {
+    "tracking": {
+      "seasons": [
+        2023,
+        2024,
+        2025
+      ],
+      "missing_seasons": [],
+      "games": 696,
+      "games_by_type": {
+        "REG": 559,
+        "PRE": 98,
+        "POST": 39
+      },
+      "players": 415,
+      "expected_players": 510
+    }
+  },
+  "n_checks": 435,
+  "n_errors": 0,
+  "n_warnings": 32,
+  "status": "pass_with_warnings"
+}

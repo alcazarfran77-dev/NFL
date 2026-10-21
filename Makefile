@@ -1,47 +1,47 @@
-# Atajos para reproducir el proyecto. En Colab se usa fuentes/entrena.ipynb, que llama a lo mismo.
+# Shortcuts to reproduce the project. In Colab, src/training.ipynb calls the same steps.
 PY ?= python3
 export MLFLOW_DISABLE_AGENT_HINT := 1
 
-.PHONY: instalar pruebas rapida validar verificar datos traduccion modelos estadistica figuras todo reubicar ui limpiar
+.PHONY: install test smoke validate verify data translation models stats figures all relocate ui clean
 
-instalar:           ## instala las dependencias fijadas
+install:            ## installs the pinned dependencies
 	$(PY) -m pip install -r requirements.txt
 
-pruebas:            ## pruebas unitarias (reglas de limpieza, métricas de movimiento, estadística, contrato, determinismo)
+test:               ## unit tests (cleaning rules, movement metrics, statistics, contract, Parquet/CSV ingestion, determinism)
 	$(PY) -m pytest -q
 
-rapida:             ## todo el flujo con CV y rejillas mínimas (CI, ~10 min; carpetas de salida propias)
-	$(PY) fuentes/train.py --config configuracion/rapida.yaml --etapa todo
+smoke:              ## the whole pipeline with minimal CV and grids (CI, ~10 min; its own output folders)
+	$(PY) src/train.py --config configs/smoke.yaml --stage all
 
-validar:            ## solo el contrato de datos: originales vs especificación -> reportes/metricas/data_contract_*
-	$(PY) fuentes/datos_prep.py --etapa contrato
+validate:           ## data contract only: raw files vs the spec -> reports/metrics/data_contract_*
+	$(PY) src/data_prep.py --stage contract
 
-verificar:          ## compara el hash de cada archivo original con datos/datos_ini/manifiesto.json
-	$(PY) fuentes/datos_prep.py --etapa verificar
+verify:             ## compares each raw file's hash with data/raw/manifest.json
+	$(PY) src/data_prep.py --stage verify
 
-datos:              ## contrato + ingesta + limpieza + movimiento + métricas de campo + manifiesto
-	$(PY) fuentes/datos_prep.py --etapa datos
+data:               ## contract + ingest + cleaning + movement + on-field metrics + manifest
+	$(PY) src/data_prep.py --stage data
 
-traduccion:         ## asociaciones prueba-partido, fiabilidad y GLM sobre los datos limpios
-	$(PY) fuentes/train.py --etapa traduccion
+translation:        ## drill-to-game associations, reliability and GLM on the clean data
+	$(PY) src/train.py --stage translation
 
-modelos:            ## traducción + CV anidada de regresión y clasificación + registro en MLflow
-	$(PY) fuentes/train.py --etapa modelos
+models:             ## translation + nested CV of regression and classification + MLflow registry
+	$(PY) src/train.py --stage models
 
-estadistica:        ## recalcula las pruebas ómnibus desde los puntajes por pliegue (sin reentrenar)
-	$(PY) fuentes/train.py --etapa estadistica
+stats:              ## recomputes the omnibus tests from the per-fold scores (no retraining)
+	$(PY) src/train.py --stage stats
 
-figuras:            ## regenera reportes/figuras desde las métricas guardadas
-	$(PY) fuentes/train.py --etapa figuras
+figures:            ## regenerates reports/figures from the saved metrics
+	$(PY) src/train.py --stage figures
 
-todo:               ## corrida completa reproducible (~60 min en 2 núcleos)
-	$(PY) fuentes/train.py --etapa todo
+all:                ## full reproducible run (~60 min on 2 cores)
+	$(PY) src/train.py --stage all
 
-reubicar:           ## una vez tras clonar o extraer: apunta las rutas del almacén MLflow a esta carpeta
-	$(PY) fuentes/train.py --etapa reubicar
+relocate:           ## once after cloning or extracting: points the MLflow store paths at this folder
+	$(PY) src/train.py --stage relocate
 
-ui:                 ## explora corridas y el registro de modelos
+ui:                 ## browse runs and the model registry
 	mlflow ui --backend-store-uri sqlite:///mlflow/mlflow.db
 
-limpiar:            ## borra las salidas de la corrida rápida (conserva datos originales, limpios y mlflow.db)
-	rm -rf datos/rapida reportes/rapida mlflow/rapida.db mlflow/rapida_artifacts
+clean:              ## deletes the smoke-run outputs (keeps raw data, clean data and mlflow.db)
+	rm -rf data/smoke reports/smoke mlflow/smoke.db mlflow/smoke_artifacts

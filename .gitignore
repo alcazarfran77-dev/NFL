@@ -1,8 +1,8 @@
-# Salidas de la corrida rápida (CI): se regeneran con `make rapida`
-datos/rapida/
-reportes/rapida/
-mlflow/rapida.db
-mlflow/rapida_artifacts/
+# Smoke-run outputs (CI): regenerated with `make smoke`
+data/smoke/
+reports/smoke/
+mlflow/smoke.db
+mlflow/smoke_artifacts/
 # Python
 __pycache__/
 *.pyc
@@ -10,5 +10,5 @@ __pycache__/
 *.egg-info/
 .venv/
 .ipynb_checkpoints/
-# Registros locales de ejecución
+# Local run logs
 logs/
