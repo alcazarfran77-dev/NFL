@@ -376,8 +376,8 @@ adds an analysis, a model or a capability. A PATCH changes no number in `reports
 | 0.1.0 | Schema-validated readers, data manifest | — |
 
 **Release runs.** Every major or minor version was trained from a clean MLflow store. Version 3.2 was retrained
-in full from scratch on the Parquet inputs: {{RUNS}} runs tagged `git_commit = {{COMMIT}}`,
-`pipeline_version = 3.2.0` and `data_version = 261a80510390`, with 17 registered models. {{RELEASE_CHECK}} The
+in full from scratch on the Parquet inputs: 93 runs tagged `git_commit = 878be03`,
+`pipeline_version = 3.2.0` and `data_version = 261a80510390`, with 17 registered models. All 90 tables in `reports/metrics/` match v3.1.0 number for number; only translated texts, the `.parquet` file names in the contract report and summary, and the date of the GLM summary change. The 21 figures show the same numbers with English text. The
 earlier versions are documented in part II.
 
 **Data versioning.** `data/raw/manifest.json` records each file's SHA-256 (of the decompressed content for a
@@ -1073,7 +1073,7 @@ make validate     # data contract only: raw files vs the spec, about 10 s
 make verify       # raw-data hashes vs the manifest
 make test         # 40 unit tests, about 15 s
 make smoke        # the whole pipeline with minimal CV and grids, about 10 min (own folders)
-make all          # release run, about 60 min on 2 cores
+make all          # release run, 60–90 min on 2 cores
 make ui           # MLflow interface: runs, metrics, registered models
 ```
 
@@ -1150,11 +1150,11 @@ replace. Published on the `english` branch; `main` keeps the Spanish v3.1.0.
 | `make pruebas`, `rapida`, `validar`, `verificar`, `todo`, `reubicar` | `make test`, `smoke`, `validate`, `verify`, `all`, `relocate` |
 
 ### Release notes
-- Trained from a clean MLflow store: {{RUNS}} runs tagged `git_commit = {{COMMIT}}`, `pipeline_version = 3.2.0`
+- Trained from a clean MLflow store: 93 runs tagged `git_commit = 878be03`, `pipeline_version = 3.2.0`
   and `data_version = 261a80510390`, with 17 registered models (the same names and aliases as in v3.1.0).
 - Verified: with the four tables read from Parquet, the data stage reproduces every file in `data/clean/` byte for
   byte against v3.1.0 (12 files); the contract gives 435 checks, 0 errors and 32 warnings with the same result for
-  every check; {{METRICS_CHECK}} All 40 tests pass and the notebook runs end to end in smoke mode. {{DURATION}}
+  every check; the 90 tables in `reports/metrics/` match v3.1.0 number for number (86 identical; in the other four only translated texts, the `.parquet` file names and the date of the GLM summary change). All 40 tests pass and the notebook runs end to end in smoke mode. The full run took 89 minutes on 2 cores.
 
 ## [3.1.0] - 2026-10-17
 

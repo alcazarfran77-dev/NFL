@@ -1,0 +1,54 @@
+artifact_path: file:///home/claude/NFL/mlflow/mlartifacts/models/m-2d9764346cbe42419e9470429953cb22/artifacts
+flavors:
+  python_function:
+    code: code
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.13.16
+  sklearn:
+    code: code
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.9.1
+    skops_trusted_types: null
+is_signature_from_type_hint: false
+mlflow_version: 3.17.1
+model_id: m-2d9764346cbe42419e9470429953cb22
+model_size_bytes: 869847
+model_uuid: m-2d9764346cbe42419e9470429953cb22
+prompts: null
+run_id: d62750e7ea7e48989cb83a173934f3e4
+saved_input_example_info:
+  artifact_path: input_example.json
+  pandas_orient: split
+  serving_input_path: serving_input_example.json
+  type: dataframe
+signature:
+  inputs: '[{"type": "string", "name": "combine_position", "required": true}, {"type":
+    "double", "name": "combine_height", "required": true}, {"type": "double", "name":
+    "combine_weight", "required": true}, {"type": "double", "name": "hand_size", "required":
+    true}, {"type": "double", "name": "arm_length", "required": true}, {"type": "double",
+    "name": "wing_span", "required": true}, {"type": "double", "name": "ten_yd_split",
+    "required": false}, {"type": "double", "name": "forty", "required": false}, {"type":
+    "double", "name": "vertical", "required": false}, {"type": "double", "name": "broad_jump",
+    "required": false}, {"type": "double", "name": "three_cone", "required": false},
+    {"type": "double", "name": "short_shuttle", "required": false}, {"type": "double",
+    "name": "bench_reps", "required": false}, {"type": "double", "name": "speed_score",
+    "required": false}, {"type": "double", "name": "ten_split_share", "required":
+    false}, {"type": "double", "name": "ten_split_momentum", "required": false}, {"type":
+    "long", "name": "ten_yd_split_missing", "required": true}, {"type": "long", "name":
+    "forty_missing", "required": true}, {"type": "long", "name": "vertical_missing",
+    "required": true}, {"type": "long", "name": "broad_jump_missing", "required":
+    true}, {"type": "long", "name": "three_cone_missing", "required": true}, {"type":
+    "long", "name": "short_shuttle_missing", "required": true}, {"type": "long", "name":
+    "bench_reps_missing", "required": true}, {"type": "long", "name": "n_drills_run",
+    "required": true}, {"type": "double", "name": "ngs_athleticism_score", "required":
+    true}, {"type": "double", "name": "age_at_draft", "required": true}]'
+  outputs: '[{"type": "tensor", "tensor-spec": {"dtype": "float64", "shape": [-1]}}]'
+  params: null
+type_hint_from_example: false
+utc_time_created: '2026-10-21 04:43:39.711183'

@@ -2,7 +2,7 @@
 
 Release run: clean MLflow store `mlflow/mlflow.db`, experiment `cgmt-combine-translation`,
 `data_version = 261a80510390` (ten raw files: four Parquet tables and six compressed CSV, with full-season game
-tracking for 2023 and 2024), seed 42, {{RUNS}} runs at commit `{{COMMIT}}`, 17 registered models. Every score is
+tracking for 2023 and 2024), seed 42, 93 runs at commit `878be03`, 17 registered models. Every score is
 out-of-sample from nested cross-validation (5 folds × 3 repeats) unless stated otherwise. Version 3.2.0 adds
 Parquet ingestion and translates the project to English; the models were retrained from the Parquet inputs and
 reproduce those of v3.1.0 and v3.0.0.

@@ -162,7 +162,7 @@ make verify       # raw-data hashes vs the manifest, about 5 s
 make validate     # data contract only, about 10 s
 make test         # 40 unit tests, about 15 s
 make smoke        # the whole pipeline with minimal grids, about 10 min (own folders, leaves the release alone)
-make all          # release run: data, translation, models, statistics and figures, about 60 min
+make all          # release run: data, translation, models, statistics and figures, 60–90 min
 make ui           # MLflow interface: runs, metrics and registered models
 ```
 

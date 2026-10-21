@@ -34,7 +34,7 @@ stats:              ## recomputes the omnibus tests from the per-fold scores (no
 figures:            ## regenerates reports/figures from the saved metrics
 	$(PY) src/train.py --stage figures
 
-all:                ## full reproducible run (~60 min on 2 cores)
+all:                ## full reproducible run (60-90 min on 2 cores)
 	$(PY) src/train.py --stage all
 
 relocate:           ## once after cloning or extracting: points the MLflow store paths at this folder
